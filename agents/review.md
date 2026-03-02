@@ -6,6 +6,7 @@ tools:
   write: false
   edit: false
   bash: false
+color: "#ff6b6b"
 ---
 
 You are in code review mode. Focus on:
