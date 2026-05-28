@@ -2,7 +2,7 @@
 
 Coding agents are powerful but tend to produce lazy, overengineered, or incomplete code. They make silent assumptions, introduce speculative abstractions, touch unrelated lines during edits, and leave placeholders or debug leftovers behind.
 
-This repository provides a set of behavioral principles and code quality rules that make the OpenCode agent produce cleaner, more reliable, and simpler code — every session, every project.
+This repository provides a set of behavioral principles and code quality rules that make OpenCode and Claude Code agents produce cleaner, more reliable, and simpler code — every session, every project.
 
 ## Table of Contents
 
@@ -28,7 +28,7 @@ AI coding agents commonly exhibit these behaviors:
 
 ## The Solution
 
-Four behavioral principles in `AGENTS.md` correct the agent's decision-making process:
+Five behavioral principles in `AGENTS.md` correct the agent's decision-making process:
 
 | Principle | What it prevents |
 |-----------|-----------------|
@@ -36,15 +36,17 @@ Four behavioral principles in `AGENTS.md` correct the agent's decision-making pr
 | **Simplicity First** | Overengineering, speculative abstractions, premature flexibility |
 | **Surgical Changes** | Scope creep, style drift, unrelated refactoring |
 | **Goal-Driven Execution** | Vague goals, untested changes, incomplete verification |
+| **Commit Messages** | Inconsistent, uninformative, or non-conventional commit history |
 
-Eight topic-specific rule files in `rules/` cover code quality dimensions with concrete rules and examples. Three auto-activating skills in `skills/` package the most common workflows (bug fixing, code review, refactoring).
+Nine topic-specific rule files in `rules/` cover code quality dimensions with concrete rules and examples. Three auto-activating skills in `skills/` package the most common workflows (bug fixing, code review, refactoring).
 
 ## Repository Structure
 
 ```
 .
-├── AGENTS.md                     # 4 behavioral principles (always loaded)
-├── rules/                        # 8 topic-specific code quality rules
+├── AGENTS.md                     # 5 behavioral principles (always loaded)
+├── CLAUDE.md                     # Symlink to AGENTS.md (Claude Code compatibility)
+├── rules/                        # 9 topic-specific code quality rules
 │   ├── structure.md              #   Structure and Organization
 │   ├── correctness.md            #   Correctness and Robustness
 │   ├── style.md                  #   Style and Consistency
@@ -52,20 +54,23 @@ Eight topic-specific rule files in `rules/` cover code quality dimensions with c
 │   ├── performance.md            #   Performance
 │   ├── testability.md            #   Testability
 │   ├── async.md                  #   Async and Concurrency
-│   └── naming.md                 #   Naming and Language Idioms
+│   ├── naming.md                 #   Naming and Language Idioms
+│   └── documentation.md          #   Documentation Standards
 ├── skills/                       # 3 auto-activating skills
 │   ├── bugfix/                   #   Goal-Driven bug fix workflow
 │   ├── code-review/              #   Structured code review checklist
 │   └── refactoring/              #   Surgical refactoring workflow
 ├── opencode.json                 # Project-local config (paths relative to repo)
 ├── opencode.global.json          # Global config template (tilde paths for home dir)
-├── install.sh                    # Install to ~/.config/opencode/
+├── install.sh                    # Install to ~/.config/opencode/ and/or ~/.claude/
 ├── uninstall.sh                  # Remove global installation
 ├── LICENSE                       # MIT License
 └── README.md                     # This file
 ```
 
 ## How It Works
+
+### OpenCode
 
 OpenCode loads these files at session start:
 
@@ -74,8 +79,6 @@ OpenCode loads these files at session start:
 | `AGENTS.md` | Auto-discovered by OpenCode at startup |
 | `rules/*.md` | Loaded via `instructions` field in `opencode.json` (glob pattern) |
 | `skills/*/` | Auto-activated by the agent when task keywords match their description |
-
-Skills trigger automatically based on context. For example, asking the agent to "fix this bug" activates the `bugfix` skill, which guides through reproduction, fix, and verification.
 
 The `opencode.json` file at the root configures everything:
 
@@ -88,7 +91,13 @@ The `opencode.json` file at the root configures everything:
 }
 ```
 
+### Claude Code
+
+Claude Code loads `~/.claude/CLAUDE.md` globally and any `CLAUDE.md` found at the project root. After installation, `~/.claude/CLAUDE.md` imports `~/.claude/AGENTS.md` (the behavioral principles) and references the rules in `~/.claude/rules/`. Skills are invoked via `/skill-name` slash commands.
+
 ## Installation
+
+The install script automatically detects which tools are installed (`opencode` and/or `claude` in PATH) and installs only for the detected tools. If neither is found, it installs for both as a safe default.
 
 ### One-liner (no clone needed)
 
@@ -96,7 +105,7 @@ The `opencode.json` file at the root configures everything:
 curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.sh | bash
 ```
 
-Downloads and installs directly to `~/.config/opencode/` without cloning the repository.
+Downloads and installs directly to `~/.config/opencode/` and/or `~/.claude/` without cloning the repository.
 
 ### Clone and install
 
@@ -130,6 +139,7 @@ These live in `AGENTS.md` and form the foundation of every interaction:
 2. **Simplicity First** — Minimum code that solves the problem. No speculative abstractions or unused flexibility.
 3. **Surgical Changes** — Touch only what you must. Match existing style. Clean up only your own orphans.
 4. **Goal-Driven Execution** — Define success criteria. Reproduce bugs with a failing test. Verify.
+5. **Commit Messages** — Follow the Conventional Commits specification when creating commits.
 
 ## Topic Rules
 
@@ -137,29 +147,30 @@ Each file in `rules/` targets a specific quality dimension:
 
 | Rule | Focus | Example |
 |------|-------|--------|
-| `structure.md` | SRP, small functions, composition over inheritance | God function vs separated responsibilities |
-| `correctness.md` | Error handling, edge cases, security | Silent `except: pass` vs proper validation |
-| `style.md` | Indentation, naming conventions, formatter, linter | Inconsistent spacing vs clean formatting |
-| `completeness.md` | No TODOs, dead code, debug leftovers | Placeholder with `print()` vs complete implementation |
+| `structure.md` | Clean Code, SRP, small functions, functional programming | God function vs separated responsibilities |
+| `correctness.md` | Error handling, exhaustive branching, security | Silent `catch` vs proper validation |
+| `style.md` | Indentation, naming conventions, professional tone, formatter | Inconsistent spacing vs clean formatting |
+| `completeness.md` | No TODOs, no agent-generated dead code, no debug leftovers | Placeholder with `print()` vs complete implementation |
 | `performance.md` | N+1 queries, lazy evaluation, unnecessary allocation | Loop query vs batch query |
 | `testability.md` | Dependency injection, behavior testing, no fragile tests | Mocking internals vs testing behavior |
 | `async.md` | No fire-and-forget, resource cleanup, cancellation | Unhandled task vs proper await and error handling |
 | `naming.md` | Meaningful names, boolean prefixes, language idioms | `calc(x, y)` vs `calculate_total(price, quantity)` |
+| `documentation.md` | Why/how focus, no obvious comments, execution instructions | Restating code vs explaining reasoning |
 
-Every rule file includes a "Bad" and "Good" code example to illustrate the principle in practice.
+Every rule file includes a `[BAD]` and `[GOOD]` example to illustrate the principle in practice.
 
 ## Skills
 
 Skills auto-activate when the task matches their trigger keywords:
 
 - **bugfix** — Guides through: write a failing reproduction test, implement the minimum fix, verify no regressions, cover edge cases.
-- **code-review** — Applies all 8 rules as a structured checklist with severity levels (error / warning / suggestion).
+- **code-review** — Applies all 9 rules as a structured checklist (simplicity, completeness, correctness, style, naming, performance, testability, async, documentation).
 - **refactoring** — Defines scope upfront, enforces surgical changes, verifies the diff traces only to the original request.
 
 ## Customization
 
 - **Add project rules** — Create more `.md` files in `rules/` or add directly to `AGENTS.md`.
-- **Personal overrides** — Install globally, then edit `~/.config/opencode/AGENTS.md`.
+- **Personal overrides** — Install globally, then edit `~/.config/opencode/AGENTS.md` or `~/.claude/AGENTS.md`.
 - **Override priority** — Project-level `AGENTS.md` overrides global. Last-loaded rule wins.
 
 ## License
