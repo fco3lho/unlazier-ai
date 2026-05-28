@@ -54,7 +54,7 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-> **Example:** Fixing an empty-email bug. Bad  Don't add type hints, docstrings, or reformat quotes. Good  Change only the specific line that fails on empty string.
+> **Example:** Fixing an empty-email bug. Bad Don't add type hints, docstrings, or reformat quotes. Good Change only the specific line that fails on empty string.
 
 ---
 

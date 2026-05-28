@@ -10,13 +10,13 @@
 
 ## Examples
 
-Bad  **Fire-and-forget, no error handling**
+Bad **Fire-and-forget, no error handling**
 ```python
 def save(data):
     asyncio.create_task(db.insert(data))
 ```
 
-Good  **Proper await + error handling**
+Good **Proper await + error handling**
 ```python
 async def save(data):
     try:

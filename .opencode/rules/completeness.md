@@ -10,7 +10,7 @@
 
 ## Examples
 
-Bad  **Placeholder + debug leftover**
+Bad **Placeholder + debug leftover**
 ```python
 def calculate_total(items):
     # TODO: implement discount logic
@@ -18,7 +18,7 @@ def calculate_total(items):
     return sum(item.price for item in items)
 ```
 
-Good  **Complete implementation, no leftovers**
+Good **Complete implementation, no leftovers**
 ```python
 def calculate_total(items):
     return sum(item.price for item in items)

@@ -11,7 +11,7 @@
 
 ## Examples
 
-Bad  **Silent failure, missing edge case**
+Bad **Silent failure, missing edge case**
 ```python
 def divide(a, b):
     try:
@@ -20,7 +20,7 @@ def divide(a, b):
         pass
 ```
 
-Good  **Meaningful error, exhaustive cases**
+Good **Meaningful error, exhaustive cases**
 ```python
 def divide(a, b):
     if b == 0:

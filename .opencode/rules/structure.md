@@ -11,7 +11,7 @@
 
 ## Examples
 
-Bad  **God function doing everything**
+Bad **God function doing everything**
 ```python
 def process_user(user_id):
     user = db.query(f"SELECT * FROM users WHERE id={user_id}")
@@ -22,7 +22,7 @@ def process_user(user_id):
     return html
 ```
 
-Good  **Separated responsibilities**
+Good **Separated responsibilities**
 ```python
 def get_user(user_id): ...
 def calculate_total(items): ...
