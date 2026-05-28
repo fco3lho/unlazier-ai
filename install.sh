@@ -110,6 +110,9 @@ if [ "$INSTALL_CLAUDE" = true ]; then
         done
     fi
 
+    # Rewrite relative rules/ paths to absolute so Claude Code finds them from any project
+    sed -i "s|rules/|${CLAUDE_DIR}/rules/|g" "$CLAUDE_DIR/CLAUDE.md"
+
     echo "Installed Claude Code config to $CLAUDE_DIR"
 fi
 
