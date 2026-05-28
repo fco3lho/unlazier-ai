@@ -1,7 +1,6 @@
 ---
 name: refactoring
 description: "Use when refactoring, simplifying, or restructuring code. Follows Surgical Changes and Simplicity First: touch only what's needed, avoid scope creep, keep it simple."
-license: MIT
 ---
 
 # Refactoring Workflow

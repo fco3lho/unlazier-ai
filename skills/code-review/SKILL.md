@@ -1,7 +1,6 @@
 ---
 name: code-review
 description: "Use when reviewing code for quality, best practices, bugs, or adherence to coding standards. Checks against Simplicity First, Completeness, Structure, Style, Correctness, Naming, Performance, Testability, and Async rules."
-license: MIT
 ---
 
 # Code Review

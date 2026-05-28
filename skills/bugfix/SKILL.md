@@ -1,7 +1,6 @@
 ---
 name: bugfix
 description: "Use when fixing a bug, defect, issue, or unexpected behavior. Follows Goal-Driven Execution: reproduce with a test, implement the fix, verify no regressions."
-license: MIT
 ---
 
 # Bug Fix Workflow

@@ -16,6 +16,7 @@ else
 fi
 
 CLAUDE_DIR="${HOME}/.claude"
+CLAUDE_BACKUP_DIR="${CLAUDE_DIR}.bak.$(date +%Y%m%d%H%M%S)"
 
 # --- OpenCode installation ---
 
@@ -48,6 +49,11 @@ fi
 echo "Installed OpenCode config to $CONFIG_DIR"
 
 # --- Claude Code installation ---
+
+if [ -d "$CLAUDE_DIR" ]; then
+    echo "Backing up existing Claude Code config to $CLAUDE_BACKUP_DIR"
+    cp -r "$CLAUDE_DIR" "$CLAUDE_BACKUP_DIR"
+fi
 
 mkdir -p "$CLAUDE_DIR/rules"
 mkdir -p "$CLAUDE_DIR/skills"
