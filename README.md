@@ -1,4 +1,8 @@
-# Unlazier AI
+<p align="center">
+  <img src="docs/images/sloth.png" alt="Sloth" width="250">
+</p>
+
+# <p align="center">Unlazier AI</p>
 
 Coding agents are powerful but tend to produce lazy, overengineered, or incomplete code. They make silent assumptions, introduce speculative abstractions, touch unrelated lines during edits, and leave placeholders or debug leftovers behind.
 
