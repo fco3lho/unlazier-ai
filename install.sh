@@ -15,6 +15,10 @@ else
     LOCAL=false
 fi
 
+CLAUDE_DIR="${HOME}/.claude"
+
+# --- OpenCode installation ---
+
 if [ -d "$CONFIG_DIR" ]; then
     echo "Backing up existing config to $BACKUP_DIR"
     cp -r "$CONFIG_DIR" "$BACKUP_DIR"
@@ -41,6 +45,33 @@ else
     curl -fsSL "$RAW_BASE/opencode.global.json" -o "$CONFIG_DIR/opencode.json"
 fi
 
-echo ""
-echo "Installed to $CONFIG_DIR"
-echo "Restart OpenCode for changes to take effect."
+echo "Installed OpenCode config to $CONFIG_DIR"
+
+# --- Claude Code installation ---
+
+mkdir -p "$CLAUDE_DIR/rules"
+mkdir -p "$CLAUDE_DIR/skills"
+
+# CLAUDE.md imports AGENTS.md via absolute path to keep a single source of truth
+{
+    echo "@${CONFIG_DIR}/AGENTS.md"
+    echo ""
+    echo "## Claude Code"
+    echo "- Load rules from ${CONFIG_DIR}/rules/ when relevant (see AGENTS.md for the full list)"
+} > "$CLAUDE_DIR/CLAUDE.md"
+
+if [ "$LOCAL" = true ]; then
+    cp rules/*.md "$CLAUDE_DIR/rules/"
+    cp -r skills/* "$CLAUDE_DIR/skills/"
+else
+    for f in structure correctness style completeness performance testability async naming; do
+        curl -fsSL "$RAW_BASE/rules/$f.md" -o "$CLAUDE_DIR/rules/$f.md"
+    done
+    for skill in bugfix code-review refactoring; do
+        mkdir -p "$CLAUDE_DIR/skills/$skill"
+        curl -fsSL "$RAW_BASE/skills/$skill/SKILL.md" -o "$CLAUDE_DIR/skills/$skill/SKILL.md"
+    done
+fi
+
+echo "Installed Claude Code config to $CLAUDE_DIR"
+echo "Restart OpenCode or Claude Code for changes to take effect."
