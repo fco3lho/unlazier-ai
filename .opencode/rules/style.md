@@ -12,13 +12,13 @@
 
 ## Examples
 
-❌ **Inconsistent style, fighting the formatter**
+Bad  **Inconsistent style, fighting the formatter**
 ```python
 def  calculate(x,y):
     return  x+ y   # espaços inconsistentes
 ```
 
-✅ **Consistent, formatter-respecting style**
+Good  **Consistent, formatter-respecting style**
 ```python
 def calculate(x, y):
     return x + y

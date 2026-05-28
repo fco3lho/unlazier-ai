@@ -10,7 +10,7 @@
 
 ## Examples
 
-❌ **Fragile test mocking implementation details**
+Bad  **Fragile test mocking implementation details**
 ```python
 def test_calculate():
     mock_db = Mock()
@@ -19,7 +19,7 @@ def test_calculate():
     assert mock_db.query.called_once_with("SELECT * FROM items")
 ```
 
-✅ **Test focused on behavior**
+Good  **Test focused on behavior**
 ```python
 def test_calculate_with_items():
     db = InMemoryDatabase([1, 2, 3])

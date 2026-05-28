@@ -17,7 +17,7 @@
 
 ## Examples
 
-❌ **Cryptic names, Hungarian notation**
+Bad  **Cryptic names, Hungarian notation**
 ```python
 def calc(x, y):
     str_n = "Alice"
@@ -25,7 +25,7 @@ def calc(x, y):
     return x * y + i_t
 ```
 
-✅ **Meaningful, idiomatic names**
+Good  **Meaningful, idiomatic names**
 ```python
 def calculate_total(price, quantity):
     customer_name = "Alice"
