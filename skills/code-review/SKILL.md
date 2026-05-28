@@ -57,3 +57,9 @@ Apply this structured review to every file changed in the diff or opened for rev
 
 - Every promise/async handled? No fire-and-forget?
 - Resources cleaned up? (connections, handles, streams)
+
+## 9. Documentation Check (`rules/documentation.md`)
+
+- Comments explain why, not what?
+- No obvious comments for self-explanatory code?
+- New modules or projects include execution instructions?

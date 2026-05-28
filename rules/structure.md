@@ -1,12 +1,13 @@
 # Structure and Organization
 
+- **Clean Code** — follow Clean Code principles: prioritize readability, maintainability, and efficiency over cleverness.
 - **Separation of Concerns** — each module, class, and function does one thing.
 - **Architectural Boundaries** — clear layers: presentation, domain, infrastructure.
 - **Small Functions** — ideally 20–40 lines max, fitting on one screen.
 - **Composition over Inheritance** — favor composition; avoid deep inheritance hierarchies.
 - **Low Coupling, High Cohesion** — minimize dependencies between modules; keep related behavior together.
 - **Single Responsibility** — each unit has one reason to change.
-- **Functional First** — favor immutability and pure functions. Prefer `map`, `filter`, `reduce` over imperative loops. Minimize side effects.
+- **Functional First** — favor immutability over mutation. Write pure functions to minimize side effects. Use `map`, `filter`, `reduce` over imperative loops. Prefer declarative over imperative logic.
 
 ---
 

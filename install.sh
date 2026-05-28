@@ -64,7 +64,7 @@ if [ "$INSTALL_OPENCODE" = true ]; then
     else
         echo "Downloading OpenCode config from $RAW_BASE..."
         curl -fsSL "$RAW_BASE/AGENTS.md" -o "$OPENCODE_DIR/AGENTS.md"
-        for f in structure correctness style completeness performance testability async naming; do
+        for f in structure correctness style completeness performance testability async naming documentation; do
             curl -fsSL "$RAW_BASE/rules/$f.md" -o "$OPENCODE_DIR/rules/$f.md"
         done
         for skill in bugfix code-review refactoring; do
@@ -101,7 +101,7 @@ if [ "$INSTALL_CLAUDE" = true ]; then
     else
         echo "Downloading Claude Code config from $RAW_BASE..."
         curl -fsSL "$RAW_BASE/AGENTS.md" -o "$CLAUDE_DIR/AGENTS.md"
-        for f in structure correctness style completeness performance testability async naming; do
+        for f in structure correctness style completeness performance testability async naming documentation; do
             curl -fsSL "$RAW_BASE/rules/$f.md" -o "$CLAUDE_DIR/rules/$f.md"
         done
         for skill in bugfix code-review refactoring; do

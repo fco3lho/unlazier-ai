@@ -128,3 +128,4 @@ For language-agnostic code quality rules organized by topic, read the relevant f
 - `rules/testability.md` — Testability
 - `rules/async.md` — Async and Concurrency
 - `rules/naming.md` — Naming and Language Idioms
+- `rules/documentation.md` — Documentation Standards
