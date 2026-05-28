@@ -77,17 +77,29 @@ The `opencode.json` file at the root configures everything:
 
 ## Installation
 
-### Global (all projects)
+### One-liner (no clone needed)
 
 ```bash
-git clone <this-repo> ~/unlazier-ai
+curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.sh | bash
+```
+
+Downloads and installs directly to `~/.config/opencode/` without cloning the repository.
+
+### Clone and install
+
+```bash
+git clone git@github.com:fco3lho/unlazier-ai.git ~/unlazier-ai
 cd ~/unlazier-ai
 ./install.sh
 ```
 
-This copies the files to `~/.config/opencode/` — OpenCode's global config directory on Linux. Every subsequent session uses these rules automatically.
+### Uninstall
 
-To remove:
+```bash
+curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/uninstall.sh | bash
+```
+
+Or if cloned:
 
 ```bash
 ./uninstall.sh
