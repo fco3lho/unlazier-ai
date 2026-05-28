@@ -5,25 +5,25 @@
 - **Defensive Programming** — validate inputs, use assertions, enforce invariants.
 - **Security** — prevent injection, never hardcode secrets, follow least-privilege principle.
 - **No Swallowed Exceptions** — `except: pass` and empty catch blocks are forbidden.
-- **Exhaustive Handling** — every if has an else, every switch has a default, every match is exhaustive.
+- **Exhaustive Branching** — `switch`/`match` must always have a `default`/exhaustive case. `if` used as a guard clause (early return or raise) does not require an `else`. Parallel `if`/`else` branches — when both paths carry distinct behavior — must handle all cases.
 
 ---
 
 ## Examples
 
-Bad **Silent failure, missing edge case**
-```python
-def divide(a, b):
+[BAD] Silent failure, missing edge case
+```
+function divide(a, b):
     try:
         return a / b
-    except:
-        pass
+    catch any_error:
+        pass  // error silently swallowed
 ```
 
-Good **Meaningful error, exhaustive cases**
-```python
-def divide(a, b):
+[GOOD] Meaningful error, handle impossible inputs explicitly
+```
+function divide(a, b):
     if b == 0:
-        raise ValueError("Division by zero")
+        raise ValueError("Division by zero is not allowed")
     return a / b
 ```

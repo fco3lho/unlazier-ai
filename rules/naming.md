@@ -17,17 +17,17 @@
 
 ## Examples
 
-Bad **Cryptic names, Hungarian notation**
-```python
-def calc(x, y):
+[BAD] Cryptic names, Hungarian notation
+```
+function calc(x, y):
     str_n = "Alice"
     i_t = 5
     return x * y + i_t
 ```
 
-Good **Meaningful, idiomatic names**
-```python
-def calculate_total(price, quantity):
+[GOOD] Meaningful, idiomatic names
+```
+function calculate_total(price, quantity):
     customer_name = "Alice"
     tax_percent = 5
     return price * quantity + tax_percent

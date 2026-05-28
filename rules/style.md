@@ -12,14 +12,14 @@
 
 ## Examples
 
-Bad **Inconsistent style, fighting the formatter**
-```python
-def  calculate(x,y):
-    return  x+ y   # espaços inconsistentes
+[BAD] Inconsistent style, fighting the formatter
+```
+function  calculate(x,y):
+    return  x+ y   // inconsistent spacing
 ```
 
-Good **Consistent, formatter-respecting style**
-```python
-def calculate(x, y):
+[GOOD] Consistent, formatter-respecting style
+```
+function calculate(x, y):
     return x + y
 ```

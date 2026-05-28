@@ -10,18 +10,20 @@
 
 ## Examples
 
-Bad **Fire-and-forget, no error handling**
-```python
-def save(data):
-    asyncio.create_task(db.insert(data))
+[BAD] Fire-and-forget, no error handling
+```
+function save(data):
+    spawn_task(db.insert(data))  // not awaited, errors silently dropped
 ```
 
-Good **Proper await + error handling**
-```python
-async def save(data):
+[GOOD] Proper await + error handling
+```
+async function save(data):
     try:
         await db.insert(data)
-    except DatabaseError as e:
-        logger.error("Failed to save: %s", e)
+    catch DatabaseError as error:
+        log.error("Failed to save: " + error)
         raise
+    finally:
+        db.close()
 ```

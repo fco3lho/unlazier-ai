@@ -11,16 +11,16 @@ Follow these steps in order. Do not skip to implementation before reproducing th
 
 Write a test that reproduces the bug:
 
-```python
-def test_xxx_describing_the_bug():
-    # Arrange
-    input = ...
-    expected = ...
+```
+function test_<describes_the_bug>():
+    // Arrange
+    input = <value_that_triggers_the_bug>
+    expected = <correct_output>
 
-    # Act
+    // Act
     result = function_under_test(input)
 
-    # Assert
+    // Assert
     assert result == expected
 ```
 

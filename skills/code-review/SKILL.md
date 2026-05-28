@@ -15,10 +15,13 @@ Apply this structured review to every file changed in the diff or opened for rev
 
 ## 2. Completeness Check (`rules/completeness.md`)
 
-- Any `# TODO`, `FIXME`, `XXX`, `pass`, `NotImplementedError`?
+- Any `// TODO`, `FIXME`, `XXX`, `pass`, `NotImplementedError`?
 - Any `console.log`, `print()`, `debugger` statements?
-- Any commented-out code, unused imports, unused variables?
-- Every `if` has an `else`? Every `switch` has a `default`?
+- Any unused imports or variables introduced by these changes?
+- Any commented-out code or unreachable branches introduced by these changes?
+- Any pre-existing dead code that should be flagged to the user?
+- Every `switch`/`match` has a `default`/exhaustive case?
+- Parallel `if`/`else` branches (non-guard-clauses) handle all paths?
 
 ## 3. Correctness Check (`rules/correctness.md`)
 

@@ -9,14 +9,14 @@
 
 ## Examples
 
-Bad **N+1 query in a loop**
-```python
-for user in users:
-    orders = db.query(f"SELECT * FROM orders WHERE user_id={user.id}")
+[BAD] N+1 query in a loop
+```
+for each user in users:
+    orders = db.query("SELECT * FROM orders WHERE user_id = " + user.id)
 ```
 
-Good **Eager-load in batch**
-```python
-user_ids = [u.id for u in users]
-orders = db.query(f"SELECT * FROM orders WHERE user_id IN ({','.join(user_ids)})")
+[GOOD] Batch query
+```
+user_ids = [user.id for each user in users]
+orders = db.query("SELECT * FROM orders WHERE user_id IN (" + join(user_ids) + ")")
 ```

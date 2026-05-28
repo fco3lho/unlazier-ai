@@ -54,7 +54,9 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-> **Example:** Fixing an empty-email bug. Bad Don't add type hints, docstrings, or reformat quotes. Good Change only the specific line that fails on empty string.
+> **Example:** Fixing an empty-email bug.
+> [BAD] Adding type hints, docstrings, or reformatting adjacent code while fixing the bug.
+> [GOOD] Changing only the exact line that fails on empty string.
 
 ---
 
@@ -68,6 +70,7 @@ Transform tasks into verifiable goals:
 - "Refactor X" -> "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
+
 ```
 1. [Step] -> verify: [check]
 2. [Step] -> verify: [check]
@@ -77,6 +80,39 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 > **Example:** "Fix the sort bug" -> "1) Write test with duplicate scores that shows instability -> verify: test fails. 2) Add stable sort key -> verify: test passes. 3) Run existing suite -> verify: no regressions."
+
+---
+
+## 5. Commit Messages
+
+**When creating commits, follow the Conventional Commits specification.**
+
+Format: `<type>[optional scope]: <description>`
+
+| Type | Use for |
+|------|---------|
+| `feat` | a new feature |
+| `fix` | a bug fix |
+| `docs` | documentation changes only |
+| `style` | formatting, no logic change |
+| `refactor` | code restructuring without behavior change |
+| `perf` | performance improvement |
+| `test` | adding or fixing tests |
+| `chore` | build process, tooling, dependencies |
+
+Rules:
+- Description in lowercase, imperative mood ("add feature" not "added feature")
+- Subject line under 72 characters
+- Use the body to explain **why**, not what
+- Mark breaking changes with `!` after the type or `BREAKING CHANGE:` in the footer
+
+> **Example:**
+> ```
+> feat(auth): add token refresh on 401 response
+>
+> Tokens were expiring mid-session with no recovery path.
+> This retries once with a fresh token before surfacing the error.
+> ```
 
 ---
 

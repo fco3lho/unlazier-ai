@@ -10,18 +10,18 @@
 
 ## Examples
 
-Bad **Fragile test mocking implementation details**
-```python
-def test_calculate():
-    mock_db = Mock()
-    mock_db.query.return_value = [1, 2, 3]
+[BAD] Fragile test mocking implementation details
+```
+function test_calculate():
+    mock_db = create_mock()
+    mock_db.query.returns([1, 2, 3])
     result = calculate(mock_db)
-    assert mock_db.query.called_once_with("SELECT * FROM items")
+    assert mock_db.query.was_called_with("SELECT * FROM items")
 ```
 
-Good **Test focused on behavior**
-```python
-def test_calculate_with_items():
-    db = InMemoryDatabase([1, 2, 3])
+[GOOD] Test focused on behavior
+```
+function test_calculate_with_items():
+    db = InMemoryDatabase(items=[item(1), item(2), item(3)])
     assert calculate(db) == 6
 ```
