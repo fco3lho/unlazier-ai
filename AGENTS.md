@@ -82,13 +82,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Detailed Rules by Topic
 
-For language-agnostic code quality rules organized by topic, read the relevant file from `.opencode/rules/` when working on a related task:
+For language-agnostic code quality rules organized by topic, read the relevant file from `rules/` when working on a related task:
 
-- `.opencode/rules/structure.md` — Structure and Organization
-- `.opencode/rules/correctness.md` — Correctness and Robustness
-- `.opencode/rules/style.md` — Style and Consistency
-- `.opencode/rules/completeness.md` — Completeness
-- `.opencode/rules/performance.md` — Performance
-- `.opencode/rules/testability.md` — Testability
-- `.opencode/rules/async.md` — Async and Concurrency
-- `.opencode/rules/naming.md` — Naming and Language Idioms
+- `rules/structure.md` — Structure and Organization
+- `rules/correctness.md` — Correctness and Robustness
+- `rules/style.md` — Style and Consistency
+- `rules/completeness.md` — Completeness
+- `rules/performance.md` — Performance
+- `rules/testability.md` — Testability
+- `rules/async.md` — Async and Concurrency
+- `rules/naming.md` — Naming and Language Idioms
