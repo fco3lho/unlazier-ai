@@ -95,12 +95,12 @@ if [ "$INSTALL_CLAUDE" = true ]; then
     mkdir -p "$CLAUDE_DIR/skills"
 
     if [ "$LOCAL" = true ]; then
-        cp AGENTS.md "$CLAUDE_DIR/AGENTS.md"
+        cp AGENTS.md "$CLAUDE_DIR/CLAUDE.md"
         cp rules/*.md "$CLAUDE_DIR/rules/"
         cp -r skills/* "$CLAUDE_DIR/skills/"
     else
         echo "Downloading Claude Code config from $RAW_BASE..."
-        curl -fsSL "$RAW_BASE/AGENTS.md" -o "$CLAUDE_DIR/AGENTS.md"
+        curl -fsSL "$RAW_BASE/AGENTS.md" -o "$CLAUDE_DIR/CLAUDE.md"
         for f in structure correctness style completeness performance testability async naming documentation; do
             curl -fsSL "$RAW_BASE/rules/$f.md" -o "$CLAUDE_DIR/rules/$f.md"
         done
@@ -109,14 +109,6 @@ if [ "$INSTALL_CLAUDE" = true ]; then
             curl -fsSL "$RAW_BASE/skills/$skill/SKILL.md" -o "$CLAUDE_DIR/skills/$skill/SKILL.md"
         done
     fi
-
-    # Generate self-contained CLAUDE.md — imports only from its own directory
-    {
-        printf "@%s/AGENTS.md\n" "$CLAUDE_DIR"
-        printf "\n"
-        printf "## Claude Code\n"
-        printf "- When starting a task, load the relevant rule file from %s/rules/ (see the list in AGENTS.md).\n" "$CLAUDE_DIR"
-    } > "$CLAUDE_DIR/CLAUDE.md"
 
     echo "Installed Claude Code config to $CLAUDE_DIR"
 fi
