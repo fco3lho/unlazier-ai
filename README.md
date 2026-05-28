@@ -4,6 +4,19 @@ Coding agents are powerful but tend to produce lazy, overengineered, or incomple
 
 This repository provides a set of behavioral principles and code quality rules that make the OpenCode agent produce cleaner, more reliable, and simpler code — every session, every project.
 
+## Table of Contents
+
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [Repository Structure](#repository-structure)
+- [How It Works](#how-it-works)
+- [Installation](#installation)
+- [Behavioral Principles](#behavioral-principles)
+- [Topic Rules](#topic-rules)
+- [Skills](#skills)
+- [Customization](#customization)
+- [License](#license)
+
 ## The Problem
 
 AI coding agents commonly exhibit these behaviors:
@@ -109,7 +122,7 @@ Or if cloned:
 
 Copy or symlink the desired files to your project root, or reference them via `instructions` in your project's `opencode.json`.
 
-## The 4 Behavioral Principles
+## Behavioral Principles
 
 These live in `AGENTS.md` and form the foundation of every interaction:
 
@@ -118,7 +131,7 @@ These live in `AGENTS.md` and form the foundation of every interaction:
 3. **Surgical Changes** — Touch only what you must. Match existing style. Clean up only your own orphans.
 4. **Goal-Driven Execution** — Define success criteria. Reproduce bugs with a failing test. Verify.
 
-## The 8 Topic Rules
+## Topic Rules
 
 Each file in `rules/` targets a specific quality dimension:
 
@@ -135,7 +148,7 @@ Each file in `rules/` targets a specific quality dimension:
 
 Every rule file includes a "Bad" and "Good" code example to illustrate the principle in practice.
 
-## The 3 Skills
+## Skills
 
 Skills auto-activate when the task matches their trigger keywords:
 
