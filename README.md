@@ -42,6 +42,8 @@ Five behavioral principles in `AGENTS.md` correct the agent's decision-making pr
 | **Goal-Driven Execution** | Vague goals, untested changes, incomplete verification |
 | **Commit Messages** | Inconsistent, uninformative, or non-conventional commit history |
 
+> **Attribution:** The four core principles (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution) originate from [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876) on LLM coding pitfalls, popularized by the [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) repository.
+
 Nine topic-specific rule files in `rules/` cover code quality dimensions with concrete rules and examples. Three auto-activating skills in `skills/` package the most common workflows (bug fixing, code review, refactoring).
 
 ## Repository Structure
