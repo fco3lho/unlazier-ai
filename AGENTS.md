@@ -16,7 +16,15 @@ Before implementing:
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
+When questioning the user, follow a structured approach:
+- Walk down each branch of the decision tree, resolving dependencies one by one.
+- Ask one question at a time. Wait for the answer before moving to the next.
+- For each question, provide your recommended answer alongside it.
+- If a question can be answered by exploring the codebase, explore instead of asking.
+
 > **Example:** User says "add export". Don't silently assume CSV. Ask: "Export to CSV, JSON, or both? All records or filtered?"
+
+> **Example:** User says "add a payment page." Ask: "Which payment provider? Stripe or something else? I recommend Stripe." Wait. Then: "Single payment or subscriptions?" And so on.
 
 ---
 
@@ -113,6 +121,27 @@ Rules:
 > Tokens were expiring mid-session with no recovery path.
 > This retries once with a fresh token before surfacing the error.
 > ```
+
+---
+
+## 6. Communication Brevity
+
+**Eliminate fluff without losing substance. Be concise.**
+
+- Drop filler words: just, really, basically, actually, simply.
+- Drop pleasantries: sure, certainly, of course, happy to.
+- Drop hedging: "I think", "maybe", "perhaps".
+- Use short synonyms (fix not "implement a solution for", big not extensive).
+- Drop articles (a/an/the) when clarity allows.
+- Abbreviate common terms: DB, auth, config, req, res, fn, impl.
+- Use fragments where appropriate. Use arrows for causality: X -> Y.
+- Pattern: `[thing] [action] [reason]. [next step].`
+
+**Exception — Auto-Clarity:**
+Revert to full clarity temporarily for: security warnings, irreversible action confirmations, ambiguous multi-step sequences. Resume brevity after.
+
+> **Bad:** "Sure! I'd be happy to help with that. The issue you're experiencing is likely caused by a misconfiguration in the authentication middleware."
+> **Good:** "Bug in auth middleware. Token expiry check uses `<` not `<=`. Fix at line 42."
 
 ---
 
