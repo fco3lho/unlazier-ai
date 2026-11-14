@@ -275,6 +275,11 @@ function Test-UninstallRestoresOriginalFiles {
     $after = Get-Snapshot $testHome
 
     Assert-That 'files identical to the original' { $before -eq $after }
+    if ($before -ne $after) {
+        Compare-Object ($before -split "`n") ($after -split "`n") | ForEach-Object {
+            Write-Host "        $($_.SideIndicator) $($_.InputObject)"
+        }
+    }
 }
 
 function Initialize-V1Installation {
