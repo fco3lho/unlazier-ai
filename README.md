@@ -4,6 +4,10 @@
 
 # <p align="center">Unlazier AI</p>
 
+<p align="center">
+  <b>English</b> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.es.md">Español</a>
+</p>
+
 AI coding assistants are powerful, but they often cut corners. They guess what you meant instead of asking, write more code than needed, change things you did not ask them to touch, and leave unfinished work behind.
 
 Unlazier AI is a set of rules that makes these assistants work more carefully. You install it once, and every AI coding tool you use follows the same rules in every project.
@@ -283,6 +287,8 @@ bash tests/install_test.sh        # Linux and macOS, needs jq
 ```
 
 The tests use a temporary home folder and never touch your real configuration. GitHub Actions runs them on Ubuntu, macOS, and Windows, plus `shellcheck` on the shell scripts.
+
+This README is the official version. [`README.pt-BR.md`](README.pt-BR.md) and [`README.es.md`](README.es.md) are translations of it; when you change this file, update them in the same change.
 
 ## License
 
