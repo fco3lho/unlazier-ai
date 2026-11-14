@@ -35,7 +35,7 @@ O Unlazier AI adiciona três camadas a cada ferramenta. Todas as ferramentas rec
 
 | Camada | O que faz | Por que importa |
 |--------|-----------|-----------------|
-| **1. Regras** | Coloca as regras no arquivo de instruções globais da ferramenta, para que o assistente as leia no início de cada sessão. | O assistente sabe o que se espera dele desde a primeira mensagem. |
+| **1. Regras** | Coloca as regras na pasta de regras da ferramenta, um arquivo pequeno por regra, ou no arquivo de instruções globais quando a ferramenta não tem pasta de regras. O assistente as lê no início de cada sessão. | O assistente sabe o que se espera dele desde a primeira mensagem. |
 | **2. Lembrete** | Reenvia um resumo curto das regras a cada mensagem sua, e os princípios principais de novo depois que a conversa é compactada. | Em sessões longas, as instruções do início perdem peso conforme a conversa cresce. O lembrete mantém as regras frescas. |
 | **3. Uso** | Acrescenta ao lembrete uma linha dizendo quanto dos seus limites de uso de 5 horas e semanal já foi consumido. | O assistente pode rodar tarefas em paralelo quando há folga e desacelerar antes de você atingir um limite. |
 
@@ -117,7 +117,7 @@ Depois de instalar, **reinicie suas ferramentas** para que elas carreguem as mud
 
 O instalador nunca substitui as suas configurações e nunca cria cópias de backup.
 
-- **Seus arquivos continuam seus.** As regras ficam dentro de um bloco marcado, que começa com `<!-- unlazier-ai:start -->` e termina com `<!-- unlazier-ai:end -->`. Nada do que você escreveu fora desse bloco é alterado. Instalar de novo só atualiza o bloco.
+- **Seus arquivos continuam seus.** As ferramentas que leem uma pasta de regras (Claude Code, Devin, Kiro, Cline) recebem arquivos próprios nela, todos com o nome `unlazier-ai-*.md`, e o seu arquivo de instruções não é alterado. As outras ferramentas leem um único arquivo de instruções, então as regras ficam dentro de um bloco marcado, que começa com `<!-- unlazier-ai:start -->` e termina com `<!-- unlazier-ai:end -->`; nada do que você escreveu fora desse bloco é alterado. Instalar de novo só atualiza esses arquivos e blocos.
 - **Os arquivos de configuração recebem acréscimos, não substituições.** Os hooks são adicionados ao lado dos que você já tem. Um arquivo de configuração que não pode ser lido com segurança (por exemplo, um com comentários) fica como está, e o instalador avisa você.
 - **Todo o resto fica numa pasta por ferramenta**, chamada `unlazier-ai`, ao lado das configurações da própria ferramenta.
 
@@ -125,12 +125,12 @@ No Windows, `~` significa a sua pasta de usuário (`C:\Users\<você>`).
 
 | Ferramenta | Regras | Lembrete | Pasta |
 |------------|--------|----------|-------|
-| Claude Code | `~/.claude/CLAUDE.md` | hooks em `~/.claude/settings.json`; status line se você não tiver uma | `~/.claude/unlazier-ai/` |
+| Claude Code | `~/.claude/rules/unlazier-ai-*.md` | hooks em `~/.claude/settings.json`; status line se você não tiver uma | `~/.claude/unlazier-ai/` |
 | Codex CLI | `~/.codex/AGENTS.md` | `~/.codex/hooks.json` | `~/.codex/unlazier-ai/` |
 | Gemini CLI | `~/.gemini/GEMINI.md` | hook em `~/.gemini/settings.json` | `~/.gemini/unlazier-ai/` |
-| Devin Desktop | `~/.devin/rules/unlazier-ai-principles.md` e `unlazier-ai-rules.md` | hook em `~/.config/devin/config.json` (Windows: `%APPDATA%\devin\config.json`) | `~/.devin/unlazier-ai/` |
-| Kiro | `~/.kiro/steering/unlazier-ai.md` | `~/.kiro/hooks/unlazier-ai.json` | `~/.kiro/unlazier-ai/` |
-| Cline | `~/Documents/Cline/Rules/unlazier-ai.md` | `~/Documents/Cline/Hooks/UserPromptSubmit` | `~/Documents/Cline/unlazier-ai/` |
+| Devin Desktop | `~/.devin/rules/unlazier-ai-*.md` | hook em `~/.config/devin/config.json` (Windows: `%APPDATA%\devin\config.json`) | `~/.devin/unlazier-ai/` |
+| Kiro | `~/.kiro/steering/unlazier-ai-*.md` | `~/.kiro/hooks/unlazier-ai.json` | `~/.kiro/unlazier-ai/` |
+| Cline | `~/Documents/Cline/Rules/unlazier-ai-*.md` | `~/Documents/Cline/Hooks/UserPromptSubmit` | `~/Documents/Cline/unlazier-ai/` |
 | OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/plugins/unlazier-ai.ts` | `~/.config/opencode/unlazier-ai/` |
 | Amp | `~/.config/amp/AGENTS.md` | `~/.config/amp/plugins/unlazier-ai.ts` | `~/.config/amp/unlazier-ai/` |
 | GitHub Copilot CLI | `~/.copilot/copilot-instructions.md` | nenhum | `~/.copilot/unlazier-ai/` |
@@ -180,7 +180,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/uninstall.ps1 | iex
 ```
 
-O desinstalador mostra o mesmo menu e remove só o que o Unlazier AI adicionou: os blocos marcados, os hooks, os plugins, a status line (só se for a que o Unlazier AI instalou) e as pastas `unlazier-ai`. Um arquivo que fica vazio depois que o bloco é removido é apagado. Suas configurações, seu histórico e suas credenciais continuam lá.
+O desinstalador mostra o mesmo menu e remove só o que o Unlazier AI adicionou: os arquivos de regras `unlazier-ai-*.md`, os blocos marcados, os hooks, os plugins, a status line (só se for a que o Unlazier AI instalou) e as pastas `unlazier-ai`. Um arquivo que fica vazio depois que o bloco é removido é apagado. Suas configurações, seu histórico e suas credenciais continuam lá.
 
 ## Atualizando da versão 1
 
@@ -194,6 +194,8 @@ O antigo `~/.claude/CLAUDE.md` (ou `~/.config/opencode/AGENTS.md`) é reconhecid
 
 ### Claude Code
 
+As regras vão para `~/.claude/rules/`, e não para o `~/.claude/CLAUDE.md`: a Anthropic recomenda manter cada CLAUDE.md com menos de 200 linhas, e cada arquivo de regra conta como um arquivo separado e curto. As regras dessa pasta são carregadas no início de cada sessão, como o CLAUDE.md. A versão 2.0 colocava as regras num bloco dentro do CLAUDE.md; instalar de novo as move e remove esse bloco.
+
 O Claude Code pede que você confie numa pasta antes de rodar hooks nela; o lembrete começa a funcionar depois que você aceita. Os dados de uso precisam de uma assinatura do Claude e de uma status line (veja [Limites de uso](#limites-de-uso-e-trabalho-em-paralelo)).
 
 ### Codex CLI
@@ -206,7 +208,7 @@ O Gemini reenvia o arquivo de instruções a cada mensagem, então não precisa 
 
 ### Devin Desktop (antigo Windsurf)
 
-O Devin limita cada arquivo de regras a 12.000 caracteres, então as regras ficam divididas em dois arquivos. O Devin também roda os hooks que encontra em `~/.claude/settings.json`; desligar isso desligaria também as suas regras do Claude Code dentro do Devin, então o Unlazier AI deixa como está. O Devin não documenta nenhum jeito de adicionar texto depois da compactação, então só o lembrete a cada mensagem é usado.
+O Devin limita cada arquivo de regras a 12.000 caracteres; cada arquivo de regra do Unlazier AI fica bem abaixo disso. O Devin também roda os hooks que encontra em `~/.claude/settings.json`; desligar isso desligaria também as suas regras do Claude Code dentro do Devin, então o Unlazier AI deixa como está. O Devin não documenta nenhum jeito de adicionar texto depois da compactação, então só o lembrete a cada mensagem é usado.
 
 ### Kiro
 
@@ -260,8 +262,8 @@ O lembrete enviado a cada mensagem está em [`reminder.md`](reminder.md).
 
 ## Personalização
 
-- **Suas próprias regras globais:** escreva-as no mesmo arquivo do bloco do Unlazier AI, fora dos marcadores. Elas sobrevivem a atualizações e desinstalações.
-- **Mudar as regras do Unlazier AI:** edite os arquivos numa cópia deste repositório e rode `./install.sh` (ou `.\install.ps1`) a partir dessa cópia. Edições feitas direto dentro do bloco instalado são substituídas na próxima instalação.
+- **Suas próprias regras globais:** escreva-as no arquivo de instruções da sua ferramenta (por exemplo `~/.claude/CLAUDE.md`), fora de qualquer bloco do Unlazier AI, ou em arquivos seus na pasta de regras com nomes que não comecem com `unlazier-ai`. Elas sobrevivem a atualizações e desinstalações.
+- **Mudar as regras do Unlazier AI:** edite os arquivos numa cópia deste repositório e rode `./install.sh` (ou `.\install.ps1`) a partir dessa cópia. Edições feitas direto nos arquivos `unlazier-ai-*.md` instalados ou dentro do bloco instalado são substituídas na próxima instalação.
 - **Regras de projeto:** cada ferramenta também lê instruções da pasta do seu projeto (por exemplo `AGENTS.md` ou `CLAUDE.md`); elas valem por cima das regras globais.
 
 ## Para contribuidores
