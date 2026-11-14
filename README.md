@@ -33,7 +33,7 @@ Unlazier AI adds three layers to each tool. Every tool gets the same three layer
 
 | Layer | What it does | Why it matters |
 |-------|--------------|----------------|
-| **1. Rules** | Adds the rules to the tool's global instructions file, so the assistant reads them at the start of every session. | The assistant knows what is expected from the first message. |
+| **1. Rules** | Adds the rules to the tool's rules folder, one small file per rule, or to its global instructions file when the tool has no rules folder. The assistant reads them at the start of every session. | The assistant knows what is expected from the first message. |
 | **2. Reminder** | Sends a short summary of the rules again with each of your messages, and the core principles again after the conversation is compacted. | In long sessions, instructions from the start lose weight as the conversation grows. The reminder keeps them fresh. |
 | **3. Usage** | Adds a line to the reminder saying how much of your 5-hour and weekly usage limits is used. | The assistant can run tasks in parallel when there is room, and slow down before you hit a limit. |
 
@@ -115,7 +115,7 @@ After installing, **restart your tools** so they load the changes.
 
 The installer never replaces your own settings and never creates backup copies.
 
-- **Your files stay yours.** The rules go inside a marked block that starts with `<!-- unlazier-ai:start -->` and ends with `<!-- unlazier-ai:end -->`. Anything you wrote outside that block is never touched. Installing again only updates the block.
+- **Your files stay yours.** Tools that read a rules folder (Claude Code, Devin, Kiro, Cline) get their own files there, all named `unlazier-ai-*.md`, and your instructions file is not touched. The other tools read a single instructions file, so the rules go inside a marked block that starts with `<!-- unlazier-ai:start -->` and ends with `<!-- unlazier-ai:end -->`; anything you wrote outside that block is never touched. Installing again only updates these files and blocks.
 - **Settings files are added to, not replaced.** Hooks are added next to the ones you already have. A settings file that cannot be read safely (for example, one with comments) is left unchanged, and the installer tells you.
 - **Everything else lives in one folder per tool**, called `unlazier-ai`, next to the tool's own settings.
 
@@ -123,12 +123,12 @@ On Windows, `~` means your user folder (`C:\Users\<you>`).
 
 | Tool | Rules | Reminder | Folder |
 |------|-------|----------|--------|
-| Claude Code | `~/.claude/CLAUDE.md` | hooks in `~/.claude/settings.json`; status line if you have none | `~/.claude/unlazier-ai/` |
+| Claude Code | `~/.claude/rules/unlazier-ai-*.md` | hooks in `~/.claude/settings.json`; status line if you have none | `~/.claude/unlazier-ai/` |
 | Codex CLI | `~/.codex/AGENTS.md` | `~/.codex/hooks.json` | `~/.codex/unlazier-ai/` |
 | Gemini CLI | `~/.gemini/GEMINI.md` | hook in `~/.gemini/settings.json` | `~/.gemini/unlazier-ai/` |
-| Devin Desktop | `~/.devin/rules/unlazier-ai-principles.md` and `unlazier-ai-rules.md` | hook in `~/.config/devin/config.json` (Windows: `%APPDATA%\devin\config.json`) | `~/.devin/unlazier-ai/` |
-| Kiro | `~/.kiro/steering/unlazier-ai.md` | `~/.kiro/hooks/unlazier-ai.json` | `~/.kiro/unlazier-ai/` |
-| Cline | `~/Documents/Cline/Rules/unlazier-ai.md` | `~/Documents/Cline/Hooks/UserPromptSubmit` | `~/Documents/Cline/unlazier-ai/` |
+| Devin Desktop | `~/.devin/rules/unlazier-ai-*.md` | hook in `~/.config/devin/config.json` (Windows: `%APPDATA%\devin\config.json`) | `~/.devin/unlazier-ai/` |
+| Kiro | `~/.kiro/steering/unlazier-ai-*.md` | `~/.kiro/hooks/unlazier-ai.json` | `~/.kiro/unlazier-ai/` |
+| Cline | `~/Documents/Cline/Rules/unlazier-ai-*.md` | `~/Documents/Cline/Hooks/UserPromptSubmit` | `~/Documents/Cline/unlazier-ai/` |
 | OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/plugins/unlazier-ai.ts` | `~/.config/opencode/unlazier-ai/` |
 | Amp | `~/.config/amp/AGENTS.md` | `~/.config/amp/plugins/unlazier-ai.ts` | `~/.config/amp/unlazier-ai/` |
 | GitHub Copilot CLI | `~/.copilot/copilot-instructions.md` | none | `~/.copilot/unlazier-ai/` |
@@ -178,7 +178,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/uninstall.ps1 | iex
 ```
 
-The uninstaller shows the same menu and removes only what Unlazier AI added: the marked blocks, its hooks, its plugins, its status line (only if it is the one Unlazier AI installed), and the `unlazier-ai` folders. A file that becomes empty after the block is removed is deleted. Your own settings, history, and credentials stay.
+The uninstaller shows the same menu and removes only what Unlazier AI added: the `unlazier-ai-*.md` rule files, the marked blocks, its hooks, its plugins, its status line (only if it is the one Unlazier AI installed), and the `unlazier-ai` folders. A file that becomes empty after the block is removed is deleted. Your own settings, history, and credentials stay.
 
 ## Upgrading from Version 1
 
@@ -192,6 +192,8 @@ The old `~/.claude/CLAUDE.md` (or `~/.config/opencode/AGENTS.md`) is recognized 
 
 ### Claude Code
 
+The rules go to `~/.claude/rules/` rather than `~/.claude/CLAUDE.md`: Anthropic recommends keeping each CLAUDE.md under 200 lines, and each rule file counts as a separate, short file. Rules in that folder load at the start of every session, like CLAUDE.md. Version 2.0 put the rules in a block inside CLAUDE.md; installing again moves them and removes that block.
+
 Claude Code asks you to trust a folder before running hooks in it; the reminder starts working after you accept. Usage data needs a Claude subscription and a status line (see [Usage Limits](#usage-limits-and-parallel-work)).
 
 ### Codex CLI
@@ -204,7 +206,7 @@ Gemini sends its instructions file again with every message, so it needs no extr
 
 ### Devin Desktop (formerly Windsurf)
 
-Devin limits each rules file to 12,000 characters, so the rules are split into two files. Devin also runs the hooks it finds in `~/.claude/settings.json`; turning that off would also turn off your Claude Code rules inside Devin, so Unlazier AI leaves it as is. Devin documents no way to add text after compaction, so only the per-message reminder is used.
+Devin limits each rules file to 12,000 characters; every Unlazier AI rule file is far below that. Devin also runs the hooks it finds in `~/.claude/settings.json`; turning that off would also turn off your Claude Code rules inside Devin, so Unlazier AI leaves it as is. Devin documents no way to add text after compaction, so only the per-message reminder is used.
 
 ### Kiro
 
@@ -258,8 +260,8 @@ The reminder that is sent with every message is in [`reminder.md`](reminder.md).
 
 ## Customization
 
-- **Your own global rules:** write them in the same file as the Unlazier AI block, outside the markers. They survive updates and uninstalls.
-- **Changing the Unlazier AI rules:** edit the files in a copy of this repository and run `./install.sh` (or `.\install.ps1`) from that copy. Edits made directly inside the installed block are replaced on the next install.
+- **Your own global rules:** write them in your tool's instructions file (for example `~/.claude/CLAUDE.md`), outside any Unlazier AI block, or in your own files in the rules folder with names that do not start with `unlazier-ai`. They survive updates and uninstalls.
+- **Changing the Unlazier AI rules:** edit the files in a copy of this repository and run `./install.sh` (or `.\install.ps1`) from that copy. Edits made directly to the installed `unlazier-ai-*.md` files or inside the installed block are replaced on the next install.
 - **Project rules:** each tool also reads instructions from your project folder (for example `AGENTS.md` or `CLAUDE.md`); those apply on top of the global rules.
 
 ## For Contributors

@@ -2,6 +2,17 @@
 
 All notable changes to Unlazier AI are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-11-14
+
+### Changed
+
+- **Rules go into the tool's rules folder, one small file per rule**, for tools that always load such a folder: Claude Code (`~/.claude/rules/`), Devin, Kiro, and Cline. Anthropic recommends keeping each CLAUDE.md under 200 lines, and version 2.0 added about 480 lines to it. Your `CLAUDE.md` is no longer touched. Tools that read a single instructions file (Codex CLI, OpenCode, Copilot CLI, Gemini CLI, Amp) keep the marked block.
+- **Upgrading from 2.0 is automatic:** installing again removes the block from `CLAUDE.md` and the old rule files in the Kiro, Cline, and Devin folders, then writes the new files.
+
+### Fixed
+
+- The Claude Code status line script is copied only when Unlazier AI actually installs the status line, instead of on every install.
+
 ## [2.0.0] - 2026-11-14
 
 Version 2 changes how Unlazier AI is installed. If you have version 1, read [Upgrading from Version 1](README.md#upgrading-from-version-1) before installing, and **do not run the version 1 uninstaller**.
