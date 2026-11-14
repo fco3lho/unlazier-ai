@@ -522,7 +522,7 @@ remove_legacy_names() {
         kiro) rm -f "$home/hooks/$LEGACY_NAME.json" ;;
     esac
     if [ -d "$home/$LEGACY_NAME" ]; then
-        rm -rf "$home/$LEGACY_NAME"
+        rm -rf "${home:?}/$LEGACY_NAME"
     fi
 }
 
