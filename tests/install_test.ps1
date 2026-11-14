@@ -141,6 +141,11 @@ function Get-Snapshot {
     param([string]$Root)
     $entries = Get-ChildItem -LiteralPath $Root -Recurse -File -Force | Sort-Object FullName | ForEach-Object {
         $relativePath = $_.FullName.Substring($Root.Length)
+        # PowerShell 7 writes its own startup cache under LOCALAPPDATA, which the tests point at
+        # the temporary home; it is not an installer file.
+        if ($relativePath -like '*\AppData\Local\Microsoft\PowerShell\*') {
+            return
+        }
         if ($_.Extension -eq '.json') {
             "$relativePath $(ConvertTo-Json -InputObject (Read-TestJson $_.FullName) -Depth 20 -Compress)"
         } else {
