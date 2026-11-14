@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2016  # jq programs use $variables inside single quotes on purpose
 # Unlazier AI installer for Linux and macOS.
 #
 # Usage:
@@ -135,7 +136,6 @@ hook_command() {
 # Claude Code, Codex, Gemini CLI, and Devin share the same hook layout:
 # {"hooks": {"<Event>": [{"matcher": "...", "hooks": [{"type": "command", "command": "..."}]}]}}.
 # Entries whose command mentions unlazier-ai are ours; everything else is left untouched.
-# shellcheck disable=SC2016  # jq programs, not shell expansions
 JQ_HOOK_HELPERS='
 def without_ours:
     if type == "array" then
