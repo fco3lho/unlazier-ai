@@ -42,7 +42,7 @@ run_installer() {
     local home="$1"
     shift
     HOME="$home" XDG_CONFIG_HOME="" CLAUDE_CONFIG_DIR="" CODEX_HOME="" COPILOT_HOME="" \
-        GEMINI_CLI_HOME="" KIRO_HOME="" CLINE_DIR="" UNLAZIER_AI_NO_PROMPT=1 \
+        GEMINI_CLI_HOME="" KIRO_HOME="" CLINE_DIR="" UNLAZIER_NO_PROMPT=1 \
         bash "$REPO_DIR/install.sh" "$@"
 }
 
@@ -50,7 +50,7 @@ run_uninstaller() {
     local home="$1"
     shift
     HOME="$home" XDG_CONFIG_HOME="" CLAUDE_CONFIG_DIR="" CODEX_HOME="" COPILOT_HOME="" \
-        GEMINI_CLI_HOME="" KIRO_HOME="" CLINE_DIR="" UNLAZIER_AI_NO_PROMPT=1 \
+        GEMINI_CLI_HOME="" KIRO_HOME="" CLINE_DIR="" UNLAZIER_NO_PROMPT=1 \
         bash "$REPO_DIR/uninstall.sh" "$@"
 }
 
@@ -67,7 +67,7 @@ snapshot() {
 }
 
 block_count() {
-    grep -cxF '<!-- unlazier-ai:start -->' "$1" 2>/dev/null || true
+    grep -cxF '<!-- unlazier:start -->' "$1" 2>/dev/null || true
 }
 
 has_one_block() { [ "$(block_count "$1")" = "1" ]; }
@@ -75,11 +75,19 @@ contains_line() { grep -qxF "$2" "$1"; }
 json_has() { [ "$(jq -r "$2" "$1")" = "true" ]; }
 file_absent() { [ ! -e "$1" ]; }
 
+# True when the hook config has exactly one Unlazier alert for the event (and matcher).
+has_alert_hook() {
+    local file="$1" event="$2" matcher="${3:-}"
+    [ "$(jq -r --arg event "$event" --arg matcher "$matcher" '
+        [(.hooks[$event] // [])[] | select((.matcher // "") == $matcher)
+         | .hooks[].command | select(endswith("/unlazier/alert.sh\""))] | length == 1' "$file")" = "true" ]
+}
+
 # Principles plus one file per topic rule.
 EXPECTED_RULE_FILES=11
 
 rule_file_count() {
-    find "$1" -maxdepth 1 -type f -name 'unlazier-ai*.md' | wc -l | tr -d ' '
+    find "$1" -maxdepth 1 -type f -name 'unlazier*.md' | wc -l | tr -d ' '
 }
 
 has_all_rule_files() { [ "$(rule_file_count "$1")" = "$EXPECTED_RULE_FILES" ]; }
@@ -87,7 +95,7 @@ has_all_rule_files() { [ "$(rule_file_count "$1")" = "$EXPECTED_RULE_FILES" ]; }
 # Every rule file stays below a character limit and a line limit.
 rule_files_within() {
     local folder="$1" max_characters="$2" max_lines="$3" file
-    for file in "$folder"/unlazier-ai*.md; do
+    for file in "$folder"/unlazier*.md; do
         [ "$(wc -m < "$file")" -lt "$max_characters" ] || return 1
         [ "$(wc -l < "$file")" -lt "$max_lines" ] || return 1
     done
@@ -120,7 +128,7 @@ test_install_preserves_user_content() {
         '[.hooks.Stop[].hooks[].command] | index("beep") != null'
     check "existing Claude status line kept" json_has "$home/.claude/settings.json" \
         '.statusLine.command == "my-status"'
-    check "unused status line script not copied" file_absent "$home/.claude/unlazier-ai/claude-statusline.sh"
+    check "unused status line script not copied" file_absent "$home/.claude/unlazier/claude-statusline.sh"
     check "existing Codex hook kept" json_has "$home/.codex/hooks.json" \
         '[.hooks.UserPromptSubmit[].hooks[].command] | index("my-codex-hook") != null'
     check "Gemini setting kept" json_has "$home/.gemini/settings.json" '.theme == "dark"'
@@ -142,7 +150,7 @@ test_install_adds_all_layers() {
     done
     check "no CLAUDE.md created" file_absent "$home/.claude/CLAUDE.md"
     for file in .claude .config/opencode .codex .copilot .gemini .config/amp .kiro Documents/Cline .devin; do
-        check "payload in $file/unlazier-ai" test -f "$home/$file/unlazier-ai/reminder.md"
+        check "payload in $file/unlazier" test -f "$home/$file/unlazier/reminder.md"
     done
     check "Claude prompt hook" json_has "$home/.claude/settings.json" \
         '[.hooks.UserPromptSubmit[].hooks[].command] | any(contains("inject.sh\" claude prompt"))'
@@ -156,12 +164,45 @@ test_install_adds_all_layers() {
         '[.hooks.BeforeAgent[].hooks[].command] | any(contains("inject.sh\" gemini prompt"))'
     check "Devin hook registered" json_has "$home/.config/devin/config.json" \
         '[.hooks.UserPromptSubmit[].hooks[].command] | any(contains("inject.sh\" devin prompt"))'
-    check "Kiro hooks" json_has "$home/.kiro/hooks/unlazier-ai.json" \
+    check "Kiro hooks" json_has "$home/.kiro/hooks/unlazier.json" \
         '[.hooks[].trigger] == ["UserPromptSubmit", "PostCompact"]'
     check "Cline hook executable" test -x "$home/Documents/Cline/Hooks/UserPromptSubmit"
-    check "OpenCode plugin" test -f "$home/.config/opencode/plugins/unlazier-ai.ts"
-    check "Amp plugin" test -f "$home/.config/amp/plugins/unlazier-ai.ts"
+    check "OpenCode plugin" test -f "$home/.config/opencode/plugins/unlazier.ts"
+    check "Amp plugin" test -f "$home/.config/amp/plugins/unlazier.ts"
     check "no backup folders" test -z "$(find "$home" -maxdepth 2 -name '*.bak*')"
+    check "alert script in payload" test -x "$home/.claude/unlazier/alert.sh"
+    check "Claude permission alert" has_alert_hook "$home/.claude/settings.json" Notification permission_prompt
+    check "Claude question alert" has_alert_hook "$home/.claude/settings.json" PreToolUse AskUserQuestion
+    check "Claude end-of-turn alert" has_alert_hook "$home/.claude/settings.json" Stop
+    check "Codex permission alert" has_alert_hook "$home/.codex/hooks.json" PermissionRequest
+    check "Codex question alert" has_alert_hook "$home/.codex/hooks.json" PreToolUse '^request_user_input$'
+    check "Codex end-of-turn alert" has_alert_hook "$home/.codex/hooks.json" Stop
+    check "Gemini attention alert" has_alert_hook "$home/.gemini/settings.json" Notification
+    check "Gemini end-of-turn alert" has_alert_hook "$home/.gemini/settings.json" AfterAgent
+    check "Devin permission alert" has_alert_hook "$home/.config/devin/config.json" PermissionRequest
+    check "Devin question alert" has_alert_hook "$home/.config/devin/config.json" PreToolUse '^ask_user_question$'
+    check "Devin end-of-turn alert" has_alert_hook "$home/.config/devin/config.json" Stop
+    check "Kiro end-of-turn alert" json_has "$home/.kiro/hooks/unlazier-alert.json" '[.hooks[].trigger] == ["Stop"]'
+    check "Copilot alerts" json_has "$home/.copilot/hooks/unlazier.json" \
+        '(.hooks.notification[0].matcher == "permission_prompt|elicitation_dialog") and (.hooks.agentStop | length == 1)'
+    check "Cline question alert executable" test -x "$home/Documents/Cline/Hooks/PreToolUse"
+    check "Cline end-of-turn alert executable" test -x "$home/Documents/Cline/Hooks/TaskComplete"
+}
+
+test_cline_question_alert_filters_tools() {
+    local home alert_log
+    echo "the Cline question alert beeps only for question tools"
+    home="$(new_home)"
+    run_installer "$home" --harness cline >/dev/null 2>&1
+    alert_log="$home/alerts.log"
+    # A stub replaces the beep so the test is silent and countable.
+    printf '#!/bin/bash\necho alert >> "%s"\n' "$alert_log" > "$home/Documents/Cline/unlazier/alert.sh"
+
+    check "hook answers cancel false" test "$(echo '{"preToolUse":{"toolName":"read_file"}}' \
+        | bash "$home/Documents/Cline/Hooks/PreToolUse")" = '{"cancel":false}'
+    check "no alert for other tools" file_absent "$alert_log"
+    echo '{"preToolUse":{"toolName":"ask_question"}}' | bash "$home/Documents/Cline/Hooks/PreToolUse" >/dev/null
+    check "alert for a question" test "$(wc -l < "$alert_log" | tr -d ' ')" = "1"
 }
 
 test_reinstall_is_idempotent() {
@@ -175,9 +216,11 @@ test_reinstall_is_idempotent() {
     check "Claude rule files written once" has_all_rule_files "$home/.claude/rules"
     check "one block in Codex AGENTS.md" has_one_block "$home/.codex/AGENTS.md"
     check "one Claude prompt hook" json_has "$home/.claude/settings.json" \
-        '[.hooks.UserPromptSubmit[].hooks[] | select(.command | contains("unlazier-ai"))] | length == 1'
+        '[.hooks.UserPromptSubmit[].hooks[] | select(.command | contains("unlazier"))] | length == 1'
+    check "one Claude end-of-turn alert" has_alert_hook "$home/.claude/settings.json" Stop
+    check "one Codex end-of-turn alert" has_alert_hook "$home/.codex/hooks.json" Stop
     check "one Codex prompt hook" json_has "$home/.codex/hooks.json" \
-        '[.hooks.UserPromptSubmit[].hooks[] | select(.command | contains("unlazier-ai"))] | length == 1'
+        '[.hooks.UserPromptSubmit[].hooks[] | select(.command | contains("unlazier"))] | length == 1'
 }
 
 test_uninstall_restores_original_files() {
@@ -235,27 +278,47 @@ test_v1_leftovers_kept_without_confirmation() {
     check "v1 skill kept" test -d "$home/.claude/skills/bugfix"
 }
 
-# Version 2.0 wrote a block into CLAUDE.md and single or split files into the rules folders.
+# Version 2.0 was named "unlazier-ai": it wrote a block into CLAUDE.md and the single-file
+# harnesses, single or split files into the rules folders, and its own folders and plugins.
 seed_v2_0_installation() {
-    local home="$1"
-    mkdir -p "$home/.claude" "$home/.kiro/steering" "$home/.devin/rules"
-    printf '# My notes\n<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n' > "$home/.claude/CLAUDE.md"
-    printf '<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n' > "$home/.kiro/steering/unlazier-ai.md"
-    printf '<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n' > "$home/.devin/rules/unlazier-ai-rules.md"
+    local home="$1" old_block
+    old_block='<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n'
+    mkdir -p "$home/.claude/unlazier-ai" "$home/.codex" "$home/.kiro/steering" "$home/.kiro/hooks" \
+        "$home/.devin/rules" "$home/.config/opencode/plugins"
+    # shellcheck disable=SC2059  # the block is a printf format on purpose, for its newlines
+    printf "# My notes\n$old_block" > "$home/.claude/CLAUDE.md"
+    # shellcheck disable=SC2059
+    printf "# Codex notes\n$old_block" > "$home/.codex/AGENTS.md"
+    # shellcheck disable=SC2059
+    printf "$old_block" > "$home/.kiro/steering/unlazier-ai.md"
+    # shellcheck disable=SC2059
+    printf "$old_block" > "$home/.devin/rules/unlazier-ai-rules.md"
+    printf 'old\n' > "$home/.claude/unlazier-ai/inject.sh"
+    printf '{}\n' > "$home/.kiro/hooks/unlazier-ai.json"
+    printf 'old\n' > "$home/.config/opencode/plugins/unlazier-ai.ts"
+    jq -n '{hooks: {UserPromptSubmit: [{hooks: [{type: "command",
+        command: "bash \"/old/.claude/unlazier-ai/inject.sh\" claude prompt"}]}]}}' > "$home/.claude/settings.json"
 }
 
 test_upgrade_from_v2_0_layout() {
     local home
-    echo "version 2.0 rules move to one file per rule"
+    echo "version 2.0 (unlazier-ai) moves to the current names and layout"
     home="$(new_home)"
     seed_v2_0_installation "$home"
-    run_installer "$home" --harness claude,kiro,devin >/dev/null 2>&1
+    run_installer "$home" --harness claude,codex,kiro,devin,opencode >/dev/null 2>&1
 
     check "old block removed from CLAUDE.md" test "$(cat "$home/.claude/CLAUDE.md")" = "# My notes"
     check "Claude rule files installed" has_all_rule_files "$home/.claude/rules"
-    check "old Kiro file removed" file_absent "$home/.kiro/steering/unlazier-ai.md"
+    check "old Codex block replaced" test "$(grep -c 'unlazier-ai' "$home/.codex/AGENTS.md")" = "0"
+    check "new Codex block added" has_one_block "$home/.codex/AGENTS.md"
+    check "old Kiro rules file removed" file_absent "$home/.kiro/steering/unlazier-ai.md"
+    check "old Kiro hook file removed" file_absent "$home/.kiro/hooks/unlazier-ai.json"
     check "old Devin split file removed" file_absent "$home/.devin/rules/unlazier-ai-rules.md"
     check "Devin rule files installed" has_all_rule_files "$home/.devin/rules"
+    check "old Claude folder removed" file_absent "$home/.claude/unlazier-ai"
+    check "old OpenCode plugin removed" file_absent "$home/.config/opencode/plugins/unlazier-ai.ts"
+    check "old Claude hook replaced" json_has "$home/.claude/settings.json" \
+        '[.hooks.UserPromptSubmit[].hooks[].command] == ["bash \"'"$home"'/.claude/unlazier/inject.sh\" claude prompt"]'
 }
 
 test_invalid_json_left_untouched() {
@@ -321,16 +384,16 @@ test_inject_usage_lines() {
         seven_day: {used_percentage: 94, resets_at: ($now - 5)}}' > "$home/.claude/state/rate_limits.json"
     write_codex_rollout "$home" "$now"
 
-    check "Claude usage line" test "$(last_line bash "$home/.claude/unlazier-ai/inject.sh" claude prompt)" \
+    check "Claude usage line" test "$(last_line bash "$home/.claude/unlazier/inject.sh" claude prompt)" \
         = "Usage: 5h 24% | weekly unknown (source: Claude Code status line, 2 min old)"
-    check "Codex usage line" test "$(last_line bash "$home/.codex/unlazier-ai/inject.sh" codex prompt)" \
+    check "Codex usage line" test "$(last_line bash "$home/.codex/unlazier/inject.sh" codex prompt)" \
         = "Usage: 5h 43% | weekly 61% (source: Codex session log, 1 min old)"
-    check "Kiro usage unknown" test "$(last_line bash "$home/.kiro/unlazier-ai/inject.sh" kiro prompt)" \
+    check "Kiro usage unknown" test "$(last_line bash "$home/.kiro/unlazier/inject.sh" kiro prompt)" \
         = "Usage: unknown (this tool does not expose usage windows)"
 
     jq --argjson old "$((now - 3600))" '.captured_at = $old' "$home/.claude/state/rate_limits.json" \
         > "$home/stale.json" && mv "$home/stale.json" "$home/.claude/state/rate_limits.json"
-    check "stale Claude reading is unknown" test "$(last_line bash "$home/.claude/unlazier-ai/inject.sh" claude prompt)" \
+    check "stale Claude reading is unknown" test "$(last_line bash "$home/.claude/unlazier/inject.sh" claude prompt)" \
         = "Usage: unknown (no usage reading from the last 15 minutes)"
 }
 
@@ -340,17 +403,17 @@ test_inject_output_formats() {
     home="$(new_home)"
     run_installer "$home" --harness claude,gemini,devin,cline >/dev/null 2>&1
 
-    check "Claude prompt is the reminder text" test "$(bash "$home/.claude/unlazier-ai/inject.sh" claude prompt | head -n 1)" \
-        = "Unlazier AI rules are active for this session."
+    check "Claude prompt is the reminder text" test "$(bash "$home/.claude/unlazier/inject.sh" claude prompt | head -n 1)" \
+        = "Unlazier rules are active for this session."
     check "Claude compaction starts with the principles" test \
-        "$(bash "$home/.claude/unlazier-ai/inject.sh" claude compact | head -n 1)" = "# Global Agent Rules"
-    check "Gemini output is JSON" json_has <(bash "$home/.gemini/unlazier-ai/inject.sh" gemini prompt) \
-        '.hookSpecificOutput.additionalContext | startswith("Unlazier AI rules")'
-    check "Devin output is JSON" json_has <(bash "$home/.devin/unlazier-ai/inject.sh" devin prompt) \
-        '.hookSpecificOutput.additionalContext | startswith("Unlazier AI rules")'
-    check "Cline output is JSON" json_has <(bash "$home/Documents/Cline/unlazier-ai/inject.sh" cline prompt) \
-        '.contextModification | startswith("Unlazier AI rules")'
-    check "unknown event fails" test "$(bash "$home/.claude/unlazier-ai/inject.sh" claude other >/dev/null 2>&1; echo $?)" = "2"
+        "$(bash "$home/.claude/unlazier/inject.sh" claude compact | head -n 1)" = "# Global Agent Rules"
+    check "Gemini output is JSON" json_has <(bash "$home/.gemini/unlazier/inject.sh" gemini prompt) \
+        '.hookSpecificOutput.additionalContext | startswith("Unlazier rules")'
+    check "Devin output is JSON" json_has <(bash "$home/.devin/unlazier/inject.sh" devin prompt) \
+        '.hookSpecificOutput.additionalContext | startswith("Unlazier rules")'
+    check "Cline output is JSON" json_has <(bash "$home/Documents/Cline/unlazier/inject.sh" cline prompt) \
+        '.contextModification | startswith("Unlazier rules")'
+    check "unknown event fails" test "$(bash "$home/.claude/unlazier/inject.sh" claude other >/dev/null 2>&1; echo $?)" = "2"
 }
 
 test_statusline_saves_usage() {
@@ -361,13 +424,14 @@ test_statusline_saves_usage() {
     now="$(date +%s)"
     output="$(jq -cn --argjson now "$now" '{rate_limits: {
         five_hour: {used_percentage: 24, resets_at: ($now + 600)},
-        seven_day: {used_percentage: 94, resets_at: ($now + 90000)}}}' \
-        | bash "$home/.claude/unlazier-ai/claude-statusline.sh")"
+        seven_day: {used_percentage: 94, resets_at: ($now + 3 * 86400 + 11 * 3600 + 30 * 60 + 30)}}}' \
+        | bash "$home/.claude/unlazier/claude-statusline.sh")"
 
     check "status line shows the 5-hour window" test -n "$(printf '%s' "$output" | grep 'Session 5h: .* 24%')"
+    check "reset time shows days" test -n "$(printf '%s' "$output" | grep 'Weekly .* resets in 3d 11h 30m$')"
     check "usage saved for the hook" json_has "$home/.claude/state/rate_limits.json" \
         '.five_hour.used_percentage == 24 and (.captured_at | type) == "number"'
-    check "broken input degrades" test "$(printf 'garbage' | bash "$home/.claude/unlazier-ai/claude-statusline.sh")" \
+    check "broken input degrades" test "$(printf 'garbage' | bash "$home/.claude/unlazier/claude-statusline.sh")" \
         = "Usage: no data"
 }
 
@@ -385,6 +449,7 @@ main() {
     test_inject_usage_lines
     test_inject_output_formats
     test_statusline_saves_usage
+    test_cline_question_alert_filters_tools
     echo
     echo "$PASSED passed, $FAILED failed"
     [ "$FAILED" -eq 0 ]

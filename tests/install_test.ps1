@@ -5,7 +5,7 @@
 #
 # Every scenario runs the scripts in a child PowerShell process whose home folder points to a
 # temporary directory, so the real configuration of the machine is never touched. The child
-# process reads USERPROFILE/HOME (home folder), APPDATA (Devin), and UNLAZIER_AI_DOCUMENTS_DIR
+# process reads USERPROFILE/HOME (home folder), APPDATA (Devin), and UNLAZIER_DOCUMENTS_DIR
 # (Cline, whose Documents folder otherwise comes from the registry). This file is kept
 # ASCII-only because Windows PowerShell 5.1 reads scripts without a byte order mark in the
 # legacy code page.
@@ -19,7 +19,7 @@ $UninstallScript = [System.IO.Path]::Combine($RepositoryDirectory, 'uninstall.ps
 $PowerShellPath = (Get-Process -Id $PID).Path
 $AllHarnesses = 'claude,opencode,codex,copilot,gemini,amp,kiro,cline,devin'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-$IsolatedVariables = @('USERPROFILE', 'HOME', 'APPDATA', 'UNLAZIER_AI_DOCUMENTS_DIR', 'UNLAZIER_AI_NO_PROMPT',
+$IsolatedVariables = @('USERPROFILE', 'HOME', 'APPDATA', 'UNLAZIER_DOCUMENTS_DIR', 'UNLAZIER_NO_PROMPT',
     'CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GEMINI_CLI_HOME', 'KIRO_HOME')
 $Results = @{ Passed = 0; Failed = 0 }
 $TemporaryHomes = New-Object System.Collections.Generic.List[string]
@@ -43,7 +43,7 @@ function Assert-That {
 }
 
 function New-TestHome {
-    $path = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "unlazier-ai-test-$([guid]::NewGuid())")
+    $path = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "unlazier-test-$([guid]::NewGuid())")
     [void][System.IO.Directory]::CreateDirectory($path)
     $TemporaryHomes.Add($path)
     return $path
@@ -79,8 +79,8 @@ function Set-IsolatedEnvironment {
     [Environment]::SetEnvironmentVariable('USERPROFILE', $TestHome)
     [Environment]::SetEnvironmentVariable('HOME', $TestHome)
     [Environment]::SetEnvironmentVariable('APPDATA', (Join-TestPath $TestHome 'AppData/Roaming'))
-    [Environment]::SetEnvironmentVariable('UNLAZIER_AI_DOCUMENTS_DIR', (Join-TestPath $TestHome 'Documents'))
-    [Environment]::SetEnvironmentVariable('UNLAZIER_AI_NO_PROMPT', '1')
+    [Environment]::SetEnvironmentVariable('UNLAZIER_DOCUMENTS_DIR', (Join-TestPath $TestHome 'Documents'))
+    [Environment]::SetEnvironmentVariable('UNLAZIER_NO_PROMPT', '1')
 }
 
 # Runs a script in a child process; returns its combined output and exit code.
@@ -113,7 +113,7 @@ function Invoke-Uninstaller {
 
 function Invoke-Inject {
     param([string]$TestHome, [string]$PayloadDirectory, [string]$Harness, [string]$EventName)
-    $scriptPath = [System.IO.Path]::Combine((Join-TestPath $TestHome $PayloadDirectory), 'unlazier-ai', 'inject.ps1')
+    $scriptPath = [System.IO.Path]::Combine((Join-TestPath $TestHome $PayloadDirectory), 'unlazier', 'inject.ps1')
     return Invoke-TestScript $TestHome $scriptPath @($Harness, $EventName)
 }
 
@@ -122,7 +122,7 @@ function Get-BlockCount {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         return 0
     }
-    return @([System.IO.File]::ReadAllText($Path) -split "`n" | Where-Object { $_.TrimEnd("`r") -eq '<!-- unlazier-ai:start -->' }).Count
+    return @([System.IO.File]::ReadAllText($Path) -split "`n" | Where-Object { $_.TrimEnd("`r") -eq '<!-- unlazier:start -->' }).Count
 }
 
 function Test-ContainsLine {
@@ -138,7 +138,7 @@ function Get-RuleFiles {
     if (-not (Test-Path -LiteralPath $Folder -PathType Container)) {
         return @()
     }
-    return @(Get-ChildItem -LiteralPath $Folder -File -Filter 'unlazier-ai*.md')
+    return @(Get-ChildItem -LiteralPath $Folder -File -Filter 'unlazier*.md')
 }
 
 function Test-HasAllRuleFiles {
@@ -161,6 +161,16 @@ function Test-RuleFilesWithin {
 function Get-HookCommands {
     param($Document, [string]$EventName)
     return @($Document.hooks.$EventName | ForEach-Object { $_.hooks } | ForEach-Object { $_.command })
+}
+
+# True when the hook config has exactly one Unlazier alert for the event (and matcher).
+function Test-HasAlertHook {
+    param([string]$Path, [string]$EventName, [string]$Matcher = '')
+    $document = Read-TestJson $Path
+    $alerts = @($document.hooks.$EventName | Where-Object { ([string]$_.matcher) -eq $Matcher } |
+        ForEach-Object { $_.hooks } | ForEach-Object { $_.command } |
+        Where-Object { ([string]$_).Contains('/unlazier/alert.ps1"') })
+    return $alerts.Count -eq 1
 }
 
 # Lists every file with its hash; JSON files are compared by content because the installer
@@ -222,7 +232,7 @@ function Test-InstallPreservesUserContent {
         (Read-TestJson (Join-TestPath $testHome '.claude/settings.json')).statusLine.command -eq 'my-status'
     }
     Assert-That 'unused status line script not copied' {
-        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/unlazier-ai/claude-statusline.ps1'))
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/unlazier/claude-statusline.ps1'))
     }
     Assert-That 'existing Codex hook kept' {
         (Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.codex/hooks.json')) 'UserPromptSubmit') -contains 'my-codex-hook'
@@ -248,8 +258,8 @@ function Test-InstallAddsAllLayers {
     Assert-That 'no CLAUDE.md created' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/CLAUDE.md')) }
     foreach ($directory in @('.claude', '.config/opencode', '.codex', '.copilot', '.gemini', '.config/amp', '.kiro',
             'Documents/Cline', '.devin')) {
-        $path = Join-TestPath $testHome "$directory/unlazier-ai/reminder.md"
-        Assert-That "payload in $directory/unlazier-ai" { Test-Path -LiteralPath $path -PathType Leaf }
+        $path = Join-TestPath $testHome "$directory/unlazier/reminder.md"
+        Assert-That "payload in $directory/unlazier" { Test-Path -LiteralPath $path -PathType Leaf }
     }
     $claudeSettings = Read-TestJson (Join-TestPath $testHome '.claude/settings.json')
     Assert-That 'Claude prompt hook' {
@@ -270,16 +280,44 @@ function Test-InstallAddsAllLayers {
             Where-Object { $_.Contains('inject.ps1" devin prompt') }).Count -eq 1
     }
     Assert-That 'Kiro hooks' {
-        (@((Read-TestJson (Join-TestPath $testHome '.kiro/hooks/unlazier-ai.json')).hooks | ForEach-Object { $_.trigger }) -join ',') `
+        (@((Read-TestJson (Join-TestPath $testHome '.kiro/hooks/unlazier.json')).hooks | ForEach-Object { $_.trigger }) -join ',') `
             -eq 'UserPromptSubmit,PostCompact'
     }
-    Assert-That 'Cline hook skipped on Windows' {
+    Assert-That 'Cline hooks skipped on Windows' {
         -not (Test-Path -LiteralPath (Join-TestPath $testHome 'Documents/Cline/Hooks'))
     }
-    Assert-That 'OpenCode plugin' { Test-Path -LiteralPath (Join-TestPath $testHome '.config/opencode/plugins/unlazier-ai.ts') -PathType Leaf }
-    Assert-That 'Amp plugin' { Test-Path -LiteralPath (Join-TestPath $testHome '.config/amp/plugins/unlazier-ai.ts') -PathType Leaf }
+    Assert-That 'OpenCode plugin' { Test-Path -LiteralPath (Join-TestPath $testHome '.config/opencode/plugins/unlazier.ts') -PathType Leaf }
+    Assert-That 'Amp plugin' { Test-Path -LiteralPath (Join-TestPath $testHome '.config/amp/plugins/unlazier.ts') -PathType Leaf }
     Assert-That 'no backup folders' {
         @(Get-ChildItem -LiteralPath $testHome -Recurse -Depth 1 -Force -Filter '*.bak*').Count -eq 0
+    }
+    Assert-That 'alert script in payload' {
+        Test-Path -LiteralPath (Join-TestPath $testHome '.claude/unlazier/alert.ps1') -PathType Leaf
+    }
+    $claudeSettingsPath = Join-TestPath $testHome '.claude/settings.json'
+    $codexHooksPath = Join-TestPath $testHome '.codex/hooks.json'
+    $geminiSettingsPath = Join-TestPath $testHome '.gemini/settings.json'
+    $devinConfigPath = Join-TestPath $testHome 'AppData/Roaming/devin/config.json'
+    Assert-That 'Claude permission alert' { Test-HasAlertHook $claudeSettingsPath 'Notification' 'permission_prompt' }
+    Assert-That 'Claude question alert' { Test-HasAlertHook $claudeSettingsPath 'PreToolUse' 'AskUserQuestion' }
+    Assert-That 'Claude end-of-turn alert' { Test-HasAlertHook $claudeSettingsPath 'Stop' }
+    Assert-That 'Codex permission alert' { Test-HasAlertHook $codexHooksPath 'PermissionRequest' }
+    Assert-That 'Codex question alert' { Test-HasAlertHook $codexHooksPath 'PreToolUse' '^request_user_input$' }
+    Assert-That 'Codex end-of-turn alert' { Test-HasAlertHook $codexHooksPath 'Stop' }
+    Assert-That 'Gemini attention alert' { Test-HasAlertHook $geminiSettingsPath 'Notification' }
+    Assert-That 'Gemini end-of-turn alert' { Test-HasAlertHook $geminiSettingsPath 'AfterAgent' }
+    Assert-That 'Devin permission alert' { Test-HasAlertHook $devinConfigPath 'PermissionRequest' }
+    Assert-That 'Devin question alert' { Test-HasAlertHook $devinConfigPath 'PreToolUse' '^ask_user_question$' }
+    Assert-That 'Devin end-of-turn alert' { Test-HasAlertHook $devinConfigPath 'Stop' }
+    Assert-That 'Kiro end-of-turn alert' {
+        (@((Read-TestJson (Join-TestPath $testHome '.kiro/hooks/unlazier-alert.json')).hooks | ForEach-Object { $_.trigger }) -join ',') `
+            -eq 'Stop'
+    }
+    Assert-That 'Copilot alerts' {
+        $copilotHooks = (Read-TestJson (Join-TestPath $testHome '.copilot/hooks/unlazier.json')).hooks
+        $copilotHooks.notification[0].matcher -eq 'permission_prompt|elicitation_dialog' -and
+            ([string]$copilotHooks.notification[0].powershell).Contains('/unlazier/alert.ps1"') -and
+            @($copilotHooks.agentStop).Count -eq 1
     }
 }
 
@@ -294,12 +332,14 @@ function Test-ReinstallIsIdempotent {
     Assert-That 'one block in Codex AGENTS.md' { (Get-BlockCount (Join-TestPath $testHome '.codex/AGENTS.md')) -eq 1 }
     Assert-That 'one Claude prompt hook' {
         @(Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.claude/settings.json')) 'UserPromptSubmit' |
-            Where-Object { $_.Contains('unlazier-ai') }).Count -eq 1
+            Where-Object { $_.Contains('unlazier') }).Count -eq 1
     }
     Assert-That 'one Codex prompt hook' {
         @(Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.codex/hooks.json')) 'UserPromptSubmit' |
-            Where-Object { $_.Contains('unlazier-ai') }).Count -eq 1
+            Where-Object { $_.Contains('unlazier') }).Count -eq 1
     }
+    Assert-That 'one Claude end-of-turn alert' { Test-HasAlertHook (Join-TestPath $testHome '.claude/settings.json') 'Stop' }
+    Assert-That 'one Codex end-of-turn alert' { Test-HasAlertHook (Join-TestPath $testHome '.codex/hooks.json') 'Stop' }
 }
 
 function Test-UninstallRestoresOriginalFiles {
@@ -365,30 +405,57 @@ function Test-V1LeftoversKeptWithoutConfirmation {
     Assert-That 'v1 skill kept' { Test-Path -LiteralPath (Join-TestPath $testHome '.claude/skills/bugfix') -PathType Container }
 }
 
-# Version 2.0 wrote a block into CLAUDE.md and single or split files into the rules folders.
+# Version 2.0 was named "unlazier-ai": it wrote a block into CLAUDE.md and the single-file
+# harnesses, single or split files into the rules folders, and its own folders and plugins.
 function Initialize-V20Installation {
     param([string]$TestHome)
     $oldBlock = "<!-- unlazier-ai:start -->`nold rules`n<!-- unlazier-ai:end -->`n"
     Write-TestFile (Join-TestPath $TestHome '.claude/CLAUDE.md') ("# My notes`n" + $oldBlock)
+    Write-TestFile (Join-TestPath $TestHome '.codex/AGENTS.md') ("# Codex notes`n" + $oldBlock)
     Write-TestFile (Join-TestPath $TestHome '.kiro/steering/unlazier-ai.md') $oldBlock
     Write-TestFile (Join-TestPath $TestHome '.devin/rules/unlazier-ai-rules.md') $oldBlock
+    Write-TestFile (Join-TestPath $TestHome '.claude/unlazier-ai/inject.ps1') "old`n"
+    Write-TestFile (Join-TestPath $TestHome '.kiro/hooks/unlazier-ai.json') "{}`n"
+    Write-TestFile (Join-TestPath $TestHome '.config/opencode/plugins/unlazier-ai.ts') "old`n"
+    Write-TestJson (Join-TestPath $TestHome '.claude/settings.json') ([pscustomobject]@{
+        hooks = [pscustomobject]@{ UserPromptSubmit = [object[]]@([pscustomobject]@{
+            hooks = [object[]]@([pscustomobject]@{ type = 'command'
+                command = 'powershell -NoProfile -File "C:/old/.claude/unlazier-ai/inject.ps1" claude prompt' }) }) }
+    })
 }
 
 function Test-UpgradeFromV20Layout {
-    Write-Host 'version 2.0 rules move to one file per rule'
+    Write-Host 'version 2.0 (unlazier-ai) moves to the current names and layout'
     $testHome = New-TestHome
     Initialize-V20Installation $testHome
-    [void](Invoke-Installer $testHome @('-Harness', 'claude,kiro,devin'))
+    [void](Invoke-Installer $testHome @('-Harness', 'claude,codex,kiro,devin,opencode'))
 
     Assert-That 'old block removed from CLAUDE.md' {
         [System.IO.File]::ReadAllText((Join-TestPath $testHome '.claude/CLAUDE.md')) -eq "# My notes`n"
     }
     Assert-That 'Claude rule files installed' { Test-HasAllRuleFiles (Join-TestPath $testHome '.claude/rules') }
-    Assert-That 'old Kiro file removed' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.kiro/steering/unlazier-ai.md')) }
+    Assert-That 'old Codex block replaced' {
+        -not ([System.IO.File]::ReadAllText((Join-TestPath $testHome '.codex/AGENTS.md'))).Contains('unlazier-ai')
+    }
+    Assert-That 'new Codex block added' { (Get-BlockCount (Join-TestPath $testHome '.codex/AGENTS.md')) -eq 1 }
+    Assert-That 'old Kiro rules file removed' {
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.kiro/steering/unlazier-ai.md'))
+    }
+    Assert-That 'old Kiro hook file removed' {
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.kiro/hooks/unlazier-ai.json'))
+    }
     Assert-That 'old Devin split file removed' {
         -not (Test-Path -LiteralPath (Join-TestPath $testHome '.devin/rules/unlazier-ai-rules.md'))
     }
     Assert-That 'Devin rule files installed' { Test-HasAllRuleFiles (Join-TestPath $testHome '.devin/rules') }
+    Assert-That 'old Claude folder removed' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/unlazier-ai')) }
+    Assert-That 'old OpenCode plugin removed' {
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.config/opencode/plugins/unlazier-ai.ts'))
+    }
+    Assert-That 'old Claude hook replaced' {
+        $commands = @(Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.claude/settings.json')) 'UserPromptSubmit')
+        $commands.Count -eq 1 -and $commands[0].Contains('/unlazier/inject.ps1" claude prompt')
+    }
 }
 
 function Test-InvalidJsonLeftUntouched {
@@ -474,19 +541,19 @@ function Test-InjectOutputFormats {
     [void](Invoke-Installer $testHome @('-Harness', 'claude,gemini,devin,cline'))
 
     Assert-That 'Claude prompt is the reminder text' {
-        (Invoke-Inject $testHome '.claude' 'claude' 'prompt').Lines[0] -eq 'Unlazier AI rules are active for this session.'
+        (Invoke-Inject $testHome '.claude' 'claude' 'prompt').Lines[0] -eq 'Unlazier rules are active for this session.'
     }
     Assert-That 'Claude compaction starts with the principles' {
         (Invoke-Inject $testHome '.claude' 'claude' 'compact').Lines[0] -eq '# Global Agent Rules'
     }
     Assert-That 'Gemini output is JSON' {
-        (ConvertFrom-OutputJson (Invoke-Inject $testHome '.gemini' 'gemini' 'prompt')).hookSpecificOutput.additionalContext.StartsWith('Unlazier AI rules')
+        (ConvertFrom-OutputJson (Invoke-Inject $testHome '.gemini' 'gemini' 'prompt')).hookSpecificOutput.additionalContext.StartsWith('Unlazier rules')
     }
     Assert-That 'Devin output is JSON' {
-        (ConvertFrom-OutputJson (Invoke-Inject $testHome '.devin' 'devin' 'prompt')).hookSpecificOutput.additionalContext.StartsWith('Unlazier AI rules')
+        (ConvertFrom-OutputJson (Invoke-Inject $testHome '.devin' 'devin' 'prompt')).hookSpecificOutput.additionalContext.StartsWith('Unlazier rules')
     }
     Assert-That 'Cline output is JSON' {
-        (ConvertFrom-OutputJson (Invoke-Inject $testHome 'Documents/Cline' 'cline' 'prompt')).contextModification.StartsWith('Unlazier AI rules')
+        (ConvertFrom-OutputJson (Invoke-Inject $testHome 'Documents/Cline' 'cline' 'prompt')).contextModification.StartsWith('Unlazier rules')
     }
     Assert-That 'unknown event fails' { (Invoke-Inject $testHome '.claude' 'claude' 'other').ExitCode -eq 2 }
 }
@@ -496,13 +563,14 @@ function Test-StatusLineSavesUsage {
     $testHome = New-TestHome
     [void](Invoke-Installer $testHome @('-Harness', 'claude'))
     $now = Get-UnixNow
-    $statusLineScript = Join-TestPath $testHome '.claude/unlazier-ai/claude-statusline.ps1'
+    $statusLineScript = Join-TestPath $testHome '.claude/unlazier/claude-statusline.ps1'
     $payload = ConvertTo-Json -Depth 10 -Compress -InputObject ([pscustomobject]@{ rate_limits = [pscustomobject]@{
         five_hour = [pscustomobject]@{ used_percentage = 24; resets_at = $now + 600 }
-        seven_day = [pscustomobject]@{ used_percentage = 94; resets_at = $now + 90000 } } })
+        seven_day = [pscustomobject]@{ used_percentage = 94; resets_at = $now + 3 * 86400 + 11 * 3600 + 30 * 60 + 30 } } })
     $result = Invoke-TestScript $testHome $statusLineScript @() $payload
 
     Assert-That 'status line shows the 5-hour window' { @($result.Lines | Where-Object { $_ -match '^Session 5h: .* 24%' }).Count -eq 1 }
+    Assert-That 'reset time shows days' { @($result.Lines | Where-Object { $_ -match '^Weekly .* resets in 3d 11h 30m$' }).Count -eq 1 }
     Assert-That 'usage saved for the hook' {
         $saved = Read-TestJson (Join-TestPath $testHome '.claude/state/rate_limits.json')
         $saved.five_hour.used_percentage -eq 24 -and $null -ne $saved.captured_at

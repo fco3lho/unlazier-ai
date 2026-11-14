@@ -1,10 +1,10 @@
-# Claude Code status line for Unlazier AI (Windows).
+# Claude Code status line for Unlazier (Windows).
 #
 # Claude Code sends the usage windows (5-hour and weekly) only to the status line command.
 # This script shows them and saves them to <claude home>\state\rate_limits.json, where the
-# Unlazier AI hook reads them to tell the agent its current usage.
+# Unlazier hook reads them to tell the agent its current usage.
 #
-# Installed at <claude home>\unlazier-ai\claude-statusline.ps1. This file is kept ASCII-only
+# Installed at <claude home>\unlazier\claude-statusline.ps1. This file is kept ASCII-only
 # because Windows PowerShell 5.1 reads scripts without a byte order mark in the legacy code
 # page; the bar characters are built from their code points instead.
 
@@ -39,8 +39,12 @@ function Format-Remaining {
         return '?'
     }
     $seconds = [long][System.Math]::Max([System.Math]::Floor([double]$ResetsAt - $Now), 0)
-    $hours = [long][System.Math]::Floor($seconds / 3600)
+    $days = [long][System.Math]::Floor($seconds / 86400)
+    $hours = [long][System.Math]::Floor(($seconds % 86400) / 3600)
     $minutes = [long][System.Math]::Floor(($seconds % 3600) / 60)
+    if ($days -gt 0) {
+        return "${days}d ${hours}h ${minutes}m"
+    }
     if ($hours -gt 0) {
         return "${hours}h ${minutes}m"
     }

@@ -1,15 +1,15 @@
 #!/bin/bash
 # shellcheck disable=SC2016  # jq programs use $variables inside single quotes on purpose
-# Unlazier AI installer for Linux and macOS.
+# Unlazier installer for Linux and macOS.
 #
 # Usage:
 #   ./install.sh [--harness <names|all>] [--yes] [--uninstall]
-#   curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier/main/install.sh | bash
 #
 #   --harness    comma-separated names (claude,opencode,codex,copilot,gemini,amp,kiro,cline,devin)
 #                or "all". Without it, an interactive menu is shown.
 #   --yes        answer "yes" to confirmations (removal of files left by version 1).
-#   --uninstall  remove Unlazier AI from the selected harnesses.
+#   --uninstall  remove Unlazier from the selected harnesses.
 #
 # Every harness receives the same three layers: the rules (a marked block in its global
 # instructions file), a reinforcement hook that re-injects a short reminder, and a usage
@@ -17,16 +17,21 @@
 
 set -euo pipefail
 
-REPO="fco3lho/unlazier-ai"
+REPO="fco3lho/unlazier"
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
 ALL_HARNESSES="claude opencode codex copilot gemini amp kiro cline devin"
 RULE_NAMES="structure correctness style completeness performance testability async naming documentation parallelism"
-PAYLOAD_FILES="AGENTS.md reminder.md hooks/inject.sh statusline/claude-statusline.sh plugins/opencode.ts plugins/amp.ts"
-MARKER_START="<!-- unlazier-ai:start -->"
-MARKER_END="<!-- unlazier-ai:end -->"
-PAYLOAD_DIR_NAME="unlazier-ai"
+PAYLOAD_FILES="AGENTS.md reminder.md hooks/inject.sh hooks/alert.sh statusline/claude-statusline.sh plugins/opencode.ts plugins/amp.ts"
+MARKER_START="<!-- unlazier:start -->"
+MARKER_END="<!-- unlazier:end -->"
+PAYLOAD_DIR_NAME="unlazier"
+
+# Version 2.0 used the name "unlazier-ai" for its markers, folders, and files.
+LEGACY_NAME="unlazier-ai"
+LEGACY_MARKER_START="<!-- unlazier-ai:start -->"
+LEGACY_MARKER_END="<!-- unlazier-ai:end -->"
 
 # Version 1 files are recognized by checksum (POSIX cksum: CRC and size) so that files the
 # user edited are never removed.
@@ -142,14 +147,18 @@ hook_command() {
     printf 'bash "%s/%s/inject.sh" %s %s' "$(harness_home "$1")" "$PAYLOAD_DIR_NAME" "$1" "$2"
 }
 
+alert_command() {
+    printf 'bash "%s/%s/alert.sh"' "$(harness_home "$1")" "$PAYLOAD_DIR_NAME"
+}
+
 # Claude Code, Codex, Gemini CLI, and Devin share the same hook layout:
 # {"hooks": {"<Event>": [{"matcher": "...", "hooks": [{"type": "command", "command": "..."}]}]}}.
-# Entries whose command mentions unlazier-ai are ours; everything else is left untouched.
+# Entries whose command mentions unlazier are ours; everything else is left untouched.
 JQ_HOOK_HELPERS='
 def without_ours:
     if type == "array" then
         map(if (.hooks | type) == "array"
-            then .hooks |= map(select((.command // "") | tostring | contains("unlazier-ai") | not))
+            then .hooks |= map(select((.command // "") | tostring | contains("unlazier") | not))
             else . end)
         | map(select((.hooks | type) != "array" or (.hooks | length) > 0))
     else . end;
@@ -173,7 +182,7 @@ update_json_file() {
     local input="{}" temporary_file
     if [ -f "$file" ]; then
         if ! jq empty "$file" >/dev/null 2>&1; then
-            warn "$file is not valid JSON; skipped. Add the Unlazier AI hook by hand (see README)."
+            warn "$file is not valid JSON; skipped. Add the Unlazier hook by hand (see README)."
             return 1
         fi
         input="$(cat "$file")"
@@ -181,7 +190,7 @@ update_json_file() {
         [ -n "$(printf '%s' "$input" | tr -d '[:space:]')" ] || input="{}"
     fi
     mkdir -p "$(dirname "$file")"
-    temporary_file="$file.unlazier-ai.tmp"
+    temporary_file="$file.unlazier.tmp"
     # Explicit checks: callers run this inside conditions, where errexit does not apply.
     if ! printf '%s' "$input" | jq "$@" "$JQ_HOOK_HELPERS $program" > "$temporary_file"; then
         rm -f "$temporary_file"
@@ -195,7 +204,7 @@ update_json_file() {
 # entries is not rewritten, so its formatting stays as the user left it.
 clean_json_file() {
     local file="$1" program="$2"
-    [ -f "$file" ] && grep -q "unlazier-ai" "$file" || return 0
+    [ -f "$file" ] && grep -q "unlazier" "$file" || return 0
     update_json_file "$file" "$program" || return 0
     if [ "$(jq -c . "$file")" = "{}" ]; then
         rm -f "$file"
@@ -215,7 +224,7 @@ register_hooks() {
             update_json_file "$home/hooks.json" \
                 'add_hook("UserPromptSubmit"; ""; $prompt) | add_hook("SessionStart"; "compact"; $compact)' \
                 --arg prompt "$(hook_command codex prompt)" --arg compact "$(hook_command codex compact)" \
-                && add_notice "Codex: open Codex and run /hooks once to trust the Unlazier AI hooks."
+                && add_notice "Codex: open Codex and run /hooks once to trust the Unlazier hooks."
             ;;
         gemini)
             update_json_file "$home/settings.json" \
@@ -232,22 +241,82 @@ register_hooks() {
             mkdir -p "$home/hooks"
             jq -n --arg prompt "$(hook_command kiro prompt)" --arg compact "$(hook_command kiro compact)" '
                 {version: "v1", hooks: [
-                    {name: "unlazier-ai-prompt", trigger: "UserPromptSubmit",
+                    {name: "unlazier-prompt", trigger: "UserPromptSubmit",
                      action: {type: "command", command: $prompt}, timeout: 30},
-                    {name: "unlazier-ai-compact", trigger: "PostCompact",
+                    {name: "unlazier-compact", trigger: "PostCompact",
                      action: {type: "command", command: $compact}, timeout: 30}]}' \
-                > "$home/hooks/unlazier-ai.json"
+                > "$home/hooks/unlazier.json"
             ;;
         cline)
-            write_cline_hook "$home/Hooks/UserPromptSubmit" \
-                && add_notice "Cline: turn on 'Enable Hooks' in Cline Feature Settings so the reminder is re-injected."
+            write_cline_hook "$home/Hooks/UserPromptSubmit" "exec $(hook_command cline prompt)" \
+                && add_notice "Cline: turn on 'Enable Hooks' in Cline Feature Settings so the reminder and alerts run."
             ;;
         opencode|amp)
             install_plugin "$harness"
             ;;
         copilot)
-            add_notice "Copilot CLI: rules installed; Copilot ignores prompt-hook output, so there is no reminder hook."
+            add_notice "Copilot CLI: Copilot ignores prompt-hook output, so there is no reminder hook."
+            return 1
             ;;
+        *) die "unknown harness '$harness'" ;;
+    esac
+}
+
+# Layer 4: three beeps when the agent asks for permission, asks a question, or finishes its
+# turn, using each harness's own events. OpenCode and Amp get it from their plugin.
+register_alerts() {
+    local harness="$1" home alert
+    home="$(harness_home "$harness")"
+    alert="$(alert_command "$harness")"
+    case "$harness" in
+        claude)
+            update_json_file "$home/settings.json" \
+                'add_hook("Notification"; "permission_prompt"; $alert)
+                 | add_hook("PreToolUse"; "AskUserQuestion"; $alert) | add_hook("Stop"; ""; $alert)' \
+                --arg alert "$alert"
+            ;;
+        codex)
+            update_json_file "$home/hooks.json" \
+                'add_hook("PermissionRequest"; ""; $alert)
+                 | add_hook("PreToolUse"; "^request_user_input$"; $alert) | add_hook("Stop"; ""; $alert)' \
+                --arg alert "$alert"
+            ;;
+        gemini)
+            # Gemini's Notification event covers both permission prompts and questions.
+            update_json_file "$home/settings.json" \
+                'add_hook("Notification"; ""; $alert) | add_hook("AfterAgent"; ""; $alert)' \
+                --arg alert "$alert"
+            ;;
+        devin)
+            update_json_file "$(devin_hooks_file)" \
+                'add_hook("PermissionRequest"; ""; $alert)
+                 | add_hook("PreToolUse"; "^ask_user_question$"; $alert) | add_hook("Stop"; ""; $alert)' \
+                --arg alert "$alert"
+            ;;
+        kiro)
+            # Kiro has no permission or question event; only the end of the turn beeps.
+            mkdir -p "$home/hooks"
+            jq -n --arg alert "$alert" '{version: "v1", hooks: [{name: "unlazier-alert", trigger: "Stop",
+                action: {type: "command", command: $alert}, timeout: 10}]}' > "$home/hooks/unlazier-alert.json"
+            ;;
+        copilot)
+            mkdir -p "$home/hooks"
+            jq -n --arg alert "$alert" '{version: 1, hooks: {
+                notification: [{matcher: "permission_prompt|elicitation_dialog", type: "command", bash: $alert, timeoutSec: 10}],
+                agentStop: [{type: "command", bash: $alert, timeoutSec: 10}]}}' > "$home/hooks/unlazier.json"
+            ;;
+        cline)
+            # Cline wires no permission event; its PreToolUse hook sees every tool, so the script
+            # beeps only for the question tools.
+            write_cline_hook "$home/Hooks/PreToolUse" "input=\"\$(cat)\"
+if printf '%s' \"\$input\" | grep -Eq '\"toolName\" *: *\"ask_(question|followup_question)\"'; then
+    $alert
+fi
+echo '{\"cancel\":false}'" \
+                && write_cline_hook "$home/Hooks/TaskComplete" "$alert
+echo '{\"cancel\":false}'"
+            ;;
+        opencode|amp) ;;
         *) die "unknown harness '$harness'" ;;
     esac
 }
@@ -259,11 +328,15 @@ unregister_hooks() {
         claude|gemini) clean_json_file "$home/settings.json" 'remove_ours' ;;
         codex) clean_json_file "$home/hooks.json" 'remove_ours' ;;
         devin) clean_json_file "$(devin_hooks_file)" 'remove_ours' ;;
-        kiro) rm -f "$home/hooks/unlazier-ai.json" ;;
-        cline) remove_cline_hook "$home/Hooks/UserPromptSubmit" ;;
-        opencode) rm -f "$home/plugins/unlazier-ai.ts" ;;
-        amp) rm -f "$home/plugins/unlazier-ai.ts" ;;
-        copilot) ;;
+        kiro) rm -f "$home/hooks/unlazier.json" "$home/hooks/unlazier-alert.json" ;;
+        cline)
+            remove_cline_hook "$home/Hooks/UserPromptSubmit"
+            remove_cline_hook "$home/Hooks/PreToolUse"
+            remove_cline_hook "$home/Hooks/TaskComplete"
+            ;;
+        opencode) rm -f "$home/plugins/unlazier.ts" ;;
+        amp) rm -f "$home/plugins/unlazier.ts" ;;
+        copilot) rm -f "$home/hooks/unlazier.json" ;;
         *) die "unknown harness '$harness'" ;;
     esac
 }
@@ -273,21 +346,21 @@ devin_hooks_file() {
 }
 
 # Cline runs an executable named after the event; if the user already has one, it is kept
-# and the reminder is not wired in, because one event can only have one script.
+# and ours is not wired in, because one event can only have one script.
 write_cline_hook() {
-    local hook_file="$1"
-    if [ -f "$hook_file" ] && ! grep -q "unlazier-ai" "$hook_file"; then
-        warn "$hook_file already exists; the Cline reminder hook was not installed."
+    local hook_file="$1" body="$2"
+    if [ -f "$hook_file" ] && ! grep -q "unlazier" "$hook_file"; then
+        warn "$hook_file already exists; the Unlazier hook for that event was not installed."
         return 1
     fi
     mkdir -p "$(dirname "$hook_file")"
-    printf '#!/bin/bash\nexec %s\n' "$(hook_command cline prompt)" > "$hook_file"
+    printf '#!/bin/bash\n%s\n' "$body" > "$hook_file"
     chmod +x "$hook_file"
 }
 
 remove_cline_hook() {
     local hook_file="$1"
-    if [ -f "$hook_file" ] && grep -q "unlazier-ai" "$hook_file"; then
+    if [ -f "$hook_file" ] && grep -q "unlazier" "$hook_file"; then
         rm -f "$hook_file"
     fi
 }
@@ -297,8 +370,8 @@ install_plugin() {
     home="$(harness_home "$harness")"
     mkdir -p "$home/plugins"
     case "$harness" in
-        opencode) cp "$SOURCE_DIR/plugins/opencode.ts" "$home/plugins/unlazier-ai.ts" ;;
-        amp) cp "$SOURCE_DIR/plugins/amp.ts" "$home/plugins/unlazier-ai.ts" ;;
+        opencode) cp "$SOURCE_DIR/plugins/opencode.ts" "$home/plugins/unlazier.ts" ;;
+        amp) cp "$SOURCE_DIR/plugins/amp.ts" "$home/plugins/unlazier.ts" ;;
         *) die "no plugin for '$harness'" ;;
     esac
 }
@@ -324,7 +397,7 @@ uninstall_statusline() {
     local settings
     settings="$(harness_home claude)/settings.json"
     clean_json_file "$settings" \
-        'if ((.statusLine.command // "") | contains("unlazier-ai")) then del(.statusLine) else . end'
+        'if ((.statusLine.command // "") | contains("unlazier")) then del(.statusLine) else . end'
 }
 
 # ---------------------------------------------------------------------------
@@ -353,7 +426,7 @@ write_block() {
     } > "$block_file"
 
     if [ -f "$file" ] && grep -qxF "$MARKER_START" "$file"; then
-        temporary_file="$file.unlazier-ai.tmp"
+        temporary_file="$file.unlazier.tmp"
         awk -v start="$MARKER_START" -v end="$MARKER_END" -v block="$block_file" '
             $0 == start { while ((getline line < block) > 0) print line; skipping = 1; next }
             skipping && $0 == end { skipping = 0; next }
@@ -370,12 +443,13 @@ write_block() {
     rm -f "$block_file"
 }
 
-# Removes the block; deletes the file when only whitespace is left.
+# Removes the block (marked with the current markers unless others are given); deletes the
+# file when only whitespace is left.
 remove_block() {
-    local file="$1" temporary_file
-    [ -f "$file" ] && grep -qxF "$MARKER_START" "$file" || return 0
-    temporary_file="$file.unlazier-ai.tmp"
-    awk -v start="$MARKER_START" -v end="$MARKER_END" '
+    local file="$1" start="${2:-$MARKER_START}" end="${3:-$MARKER_END}" temporary_file
+    [ -f "$file" ] && grep -qxF "$start" "$file" || return 0
+    temporary_file="$file.unlazier.tmp"
+    awk -v start="$start" -v end="$end" '
         $0 == start { skipping = 1; next }
         skipping && $0 == end { skipping = 0; next }
         !skipping { print }
@@ -386,11 +460,11 @@ remove_block() {
     fi
 }
 
-# Our files are recognized by the "unlazier-ai" prefix; the pattern also covers the single
-# unlazier-ai.md and the two split files that version 2.0 wrote to these folders.
+# Our files are recognized by the "unlazier" prefix; the pattern also covers the
+# unlazier-ai*.md files that version 2.0 wrote to these folders.
 remove_rule_files() {
     local folder="$1" file
-    for file in "$folder"/unlazier-ai*.md; do
+    for file in "$folder"/unlazier*.md; do
         if [ -f "$file" ]; then
             rm -f "$file"
         fi
@@ -401,9 +475,9 @@ write_rule_files() {
     local folder="$1" name
     remove_rule_files "$folder"
     mkdir -p "$folder"
-    cp "$SOURCE_DIR/AGENTS.md" "$folder/unlazier-ai-principles.md"
+    cp "$SOURCE_DIR/AGENTS.md" "$folder/unlazier-principles.md"
     for name in $RULE_NAMES; do
-        cp "$SOURCE_DIR/rules/$name.md" "$folder/unlazier-ai-$name.md"
+        cp "$SOURCE_DIR/rules/$name.md" "$folder/unlazier-$name.md"
     done
 }
 
@@ -416,12 +490,8 @@ install_rules() {
         log "  rules      -> $file"
         return 0
     fi
-    # Version 2.0 put the Claude Code rules in a block inside CLAUDE.md.
-    if [ "$harness" = "claude" ]; then
-        remove_block "$(harness_home claude)/CLAUDE.md"
-    fi
     write_rule_files "$folder"
-    log "  rules      -> $folder/unlazier-ai-*.md"
+    log "  rules      -> $folder/unlazier-*.md"
 }
 
 uninstall_rules() {
@@ -431,19 +501,38 @@ uninstall_rules() {
         remove_block "$(rules_file "$harness")"
         return 0
     fi
-    if [ "$harness" = "claude" ]; then
-        remove_block "$(harness_home claude)/CLAUDE.md"
-    fi
     remove_rule_files "$folder"
 }
 
-# Copies the files the hook reads into <harness home>/unlazier-ai/.
+# Removes what version 2.0 installed under its old name, so it does not load next to the
+# renamed files. Hook entries, the status line, and rule files need nothing extra: their
+# names contain "unlazier", which matches both names.
+remove_legacy_names() {
+    local harness="$1" home folder
+    home="$(harness_home "$harness")"
+    folder="$(rules_folder "$harness")"
+    if [ -z "$folder" ]; then
+        remove_block "$(rules_file "$harness")" "$LEGACY_MARKER_START" "$LEGACY_MARKER_END"
+    elif [ "$harness" = "claude" ]; then
+        # Version 2.0 put the Claude Code rules in a block inside CLAUDE.md.
+        remove_block "$home/CLAUDE.md" "$LEGACY_MARKER_START" "$LEGACY_MARKER_END"
+    fi
+    case "$harness" in
+        opencode|amp) rm -f "$home/plugins/$LEGACY_NAME.ts" ;;
+        kiro) rm -f "$home/hooks/$LEGACY_NAME.json" ;;
+    esac
+    if [ -d "$home/$LEGACY_NAME" ]; then
+        rm -rf "$home/$LEGACY_NAME"
+    fi
+}
+
+# Copies the files the hook reads into <harness home>/unlazier/.
 install_payload() {
     local harness="$1" target
     target="$(harness_home "$harness")/$PAYLOAD_DIR_NAME"
     mkdir -p "$target"
-    cp "$SOURCE_DIR/AGENTS.md" "$SOURCE_DIR/reminder.md" "$SOURCE_DIR/hooks/inject.sh" "$target/"
-    chmod +x "$target/inject.sh"
+    cp "$SOURCE_DIR/AGENTS.md" "$SOURCE_DIR/reminder.md" "$SOURCE_DIR/hooks/inject.sh" "$SOURCE_DIR/hooks/alert.sh" "$target/"
+    chmod +x "$target/inject.sh" "$target/alert.sh"
 }
 
 remove_payload() {
@@ -502,7 +591,7 @@ remove_v1_leftovers() {
     local leftovers="$1" path
     [ -n "$leftovers" ] || return 0
     log ""
-    log "Files from Unlazier AI version 1 were found:"
+    log "Files from Unlazier version 1 were found:"
     printf '%s\n' "$leftovers" | sed 's/^/  - /'
     log "Version 2 replaces them. If you added your own notes to any of these files, answer 'n'."
     if ! confirm "Remove these files?"; then
@@ -522,10 +611,10 @@ EOF
 # ---------------------------------------------------------------------------
 
 # Reads one line from the terminal even when the script itself arrives through a pipe.
-# UNLAZIER_AI_NO_PROMPT=1 behaves as if no terminal were attached (used by automation and tests).
+# UNLAZIER_NO_PROMPT=1 behaves as if no terminal were attached (used by automation and tests).
 read_from_terminal() {
     local answer
-    [ "${UNLAZIER_AI_NO_PROMPT:-}" = "1" ] && return 1
+    [ "${UNLAZIER_NO_PROMPT:-}" = "1" ] && return 1
     { exec 3</dev/tty; } 2>/dev/null || return 1
     IFS= read -r answer <&3 || answer=""
     exec 3<&-
@@ -573,7 +662,7 @@ select_harnesses() {
 
     {
         log ""
-        log "Choose the tools to $MODE Unlazier AI for (* = found on this computer):"
+        log "Choose the tools to $MODE Unlazier for (* = found on this computer):"
         for harness in $ALL_HARNESSES; do
             marker=" "
             case " $detected " in *" $harness "*) marker="*" ;; esac
@@ -620,7 +709,7 @@ prepare_source() {
     command -v curl >/dev/null 2>&1 || die "curl is required but not installed."
     DOWNLOAD_DIR="$(mktemp -d)"
     trap 'rm -rf "$DOWNLOAD_DIR"' EXIT
-    log "Downloading Unlazier AI from $RAW_BASE..."
+    log "Downloading Unlazier from $RAW_BASE..."
     for relative_path in $PAYLOAD_FILES $(for name in $RULE_NAMES; do echo "rules/$name.md"; done); do
         mkdir -p "$DOWNLOAD_DIR/$(dirname "$relative_path")"
         curl -fsSL "$RAW_BASE/$relative_path" -o "$DOWNLOAD_DIR/$relative_path" \
@@ -685,15 +774,22 @@ install_harness() {
     log ""
     log "$(harness_label "$harness"):"
     harness_warnings "$harness"
+    remove_legacy_names "$harness"
     install_payload "$harness"
     install_rules "$harness"
     case "$harness" in
-        opencode|amp|copilot)
+        opencode|amp)
+            # One plugin carries both the reminder and the alerts, and needs no jq.
             register_hooks "$harness"
+            log "  reminder   -> plugin"
+            log "  alerts     -> plugin"
             ;;
         *)
             if [ "$HAS_JQ" = true ] && register_hooks "$harness"; then
                 log "  reminder   -> hook registered"
+            fi
+            if [ "$HAS_JQ" = true ] && register_alerts "$harness"; then
+                log "  alerts     -> hook registered"
             fi
             ;;
     esac
@@ -706,6 +802,7 @@ uninstall_harness() {
     local harness="$1"
     log ""
     log "$(harness_label "$harness"):"
+    remove_legacy_names "$harness"
     uninstall_rules "$harness"
     case "$harness" in
         claude|codex|gemini|devin)

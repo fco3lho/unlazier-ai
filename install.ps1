@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Unlazier AI installer for Windows.
+    Unlazier installer for Windows.
 
 .DESCRIPTION
     Every harness receives the same three layers: the rules (a marked block in its global
@@ -8,8 +8,8 @@
     line inside that reminder. Existing user content is never replaced and no backups are made.
 
     From a clone:     .\install.ps1 [-Harness <names|all>] [-Yes] [-Uninstall]
-    Without a clone:  irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.ps1 | iex
-    With options:     & ([scriptblock]::Create((irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.ps1))) -Harness codex
+    Without a clone:  irm https://raw.githubusercontent.com/fco3lho/unlazier/main/install.ps1 | iex
+    With options:     & ([scriptblock]::Create((irm https://raw.githubusercontent.com/fco3lho/unlazier/main/install.ps1))) -Harness codex
 
 .PARAMETER Harness
     Comma-separated names (claude,opencode,codex,copilot,gemini,amp,kiro,cline,devin) or "all".
@@ -19,7 +19,7 @@
     Answer "yes" to confirmations (removal of files left by version 1).
 
 .PARAMETER Uninstall
-    Remove Unlazier AI from the selected harnesses.
+    Remove Unlazier from the selected harnesses.
 #>
 param(
     [string]$Harness = '',
@@ -36,15 +36,20 @@ param(
     $ErrorActionPreference = 'Stop'
     Set-StrictMode -Version 2.0
 
-    $RawBase = 'https://raw.githubusercontent.com/fco3lho/unlazier-ai/main'
+    $RawBase = 'https://raw.githubusercontent.com/fco3lho/unlazier/main'
     $AllHarnesses = @('claude', 'opencode', 'codex', 'copilot', 'gemini', 'amp', 'kiro', 'cline', 'devin')
     $RuleNames = @('structure', 'correctness', 'style', 'completeness', 'performance', 'testability', 'async',
         'naming', 'documentation', 'parallelism')
-    $PayloadFiles = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1', 'statusline/claude-statusline.ps1',
-        'plugins/opencode.ts', 'plugins/amp.ts')
-    $MarkerStart = '<!-- unlazier-ai:start -->'
-    $MarkerEnd = '<!-- unlazier-ai:end -->'
-    $PayloadDirectoryName = 'unlazier-ai'
+    $PayloadFiles = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1', 'hooks/alert.ps1',
+        'statusline/claude-statusline.ps1', 'plugins/opencode.ts', 'plugins/amp.ts')
+    $MarkerStart = '<!-- unlazier:start -->'
+    $MarkerEnd = '<!-- unlazier:end -->'
+    $PayloadDirectoryName = 'unlazier'
+
+    # Version 2.0 used the name "unlazier-ai" for its markers, folders, and files.
+    $LegacyName = 'unlazier-ai'
+    $LegacyMarkerStart = '<!-- unlazier-ai:start -->'
+    $LegacyMarkerEnd = '<!-- unlazier-ai:end -->'
     $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
     # Version 1 files are recognized by the SHA-256 of their LF-normalized text, so files the
@@ -115,10 +120,10 @@ param(
     }
 
     # Cline keeps its global rules under the user's Documents folder, which Windows may redirect
-    # (for example to OneDrive). UNLAZIER_AI_DOCUMENTS_DIR overrides it because the real folder
+    # (for example to OneDrive). UNLAZIER_DOCUMENTS_DIR overrides it because the real folder
     # comes from the registry and cannot be isolated otherwise; the tests rely on it.
     function Get-DocumentsDirectory {
-        $override = [Environment]::GetEnvironmentVariable('UNLAZIER_AI_DOCUMENTS_DIR')
+        $override = [Environment]::GetEnvironmentVariable('UNLAZIER_DOCUMENTS_DIR')
         if (-not [string]::IsNullOrEmpty($override)) {
             return $override
         }
@@ -207,6 +212,12 @@ param(
         param([string]$Name, [string]$EventName)
         $scriptPath = [System.IO.Path]::Combine((Get-HarnessHome $Name), $PayloadDirectoryName, 'inject.ps1')
         return Get-ScriptCommand $scriptPath "$Name $EventName"
+    }
+
+    function Get-AlertCommand {
+        param([string]$Name)
+        $scriptPath = [System.IO.Path]::Combine((Get-HarnessHome $Name), $PayloadDirectoryName, 'alert.ps1')
+        return Get-ScriptCommand $scriptPath ''
     }
 
     function Get-DevinHooksFile {
@@ -300,11 +311,11 @@ param(
             Assert-StrictJson $text
             $document = ConvertFrom-JsonText $text
         } catch {
-            Write-Warning "$Path is not valid JSON ($($_.Exception.Message)); skipped. Add the Unlazier AI hook by hand (see README)."
+            Write-Warning "$Path is not valid JSON ($($_.Exception.Message)); skipped. Add the Unlazier hook by hand (see README)."
             return $null
         }
         if ($document -isnot [System.Management.Automation.PSCustomObject]) {
-            Write-Warning "$Path does not hold a JSON object; skipped. Add the Unlazier AI hook by hand (see README)."
+            Write-Warning "$Path does not hold a JSON object; skipped. Add the Unlazier hook by hand (see README)."
             return $null
         }
         return $document
@@ -323,11 +334,11 @@ param(
 
     # Claude Code, Codex, Gemini CLI, and Devin share the same hook layout:
     # {"hooks": {"<Event>": [{"matcher": "...", "hooks": [{"type": "command", "command": "..."}]}]}}.
-    # Entries whose command mentions unlazier-ai are ours; everything else is left untouched.
+    # Entries whose command mentions unlazier are ours; everything else is left untouched.
     function Test-OurCommand {
         param($Hook)
         $command = Get-JsonProperty $Hook 'command'
-        return ($null -ne $command) -and ([string]$command).Contains('unlazier-ai')
+        return ($null -ne $command) -and ([string]$command).Contains('unlazier')
     }
 
     function Remove-OurHookEntries {
@@ -433,7 +444,7 @@ param(
         Remove-OurHooks $document
         if ($IncludeStatusLine) {
             $statusCommand = Get-JsonProperty (Get-JsonProperty $document 'statusLine') 'command'
-            if ($null -ne $statusCommand -and ([string]$statusCommand).Contains('unlazier-ai')) {
+            if ($null -ne $statusCommand -and ([string]$statusCommand).Contains('unlazier')) {
                 $document.PSObject.Properties.Remove('statusLine')
             }
         }
@@ -460,7 +471,7 @@ param(
                     (New-Registration 'SessionStart' 'compact' (Get-HookCommand 'codex' 'compact'))
                 )
                 if ($isUpdated) {
-                    Add-Notice 'Codex: open Codex and run /hooks once to trust the Unlazier AI hooks.'
+                    Add-Notice 'Codex: open Codex and run /hooks once to trust the Unlazier hooks.'
                 }
                 return $isUpdated
             }
@@ -476,17 +487,17 @@ param(
                 )
             }
             'kiro' {
-                $hookFile = [System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier-ai.json')
+                $hookFile = [System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier.json')
                 Write-JsonConfig $hookFile ([pscustomobject]@{
                     version = 'v1'
                     hooks = [object[]]@(
                         [pscustomobject]@{
-                            name = 'unlazier-ai-prompt'; trigger = 'UserPromptSubmit'
+                            name = 'unlazier-prompt'; trigger = 'UserPromptSubmit'
                             action = [pscustomobject]@{ type = 'command'; command = (Get-HookCommand 'kiro' 'prompt') }
                             timeout = 30
                         },
                         [pscustomobject]@{
-                            name = 'unlazier-ai-compact'; trigger = 'PostCompact'
+                            name = 'unlazier-compact'; trigger = 'PostCompact'
                             action = [pscustomobject]@{ type = 'command'; command = (Get-HookCommand 'kiro' 'compact') }
                             timeout = 30
                         }
@@ -495,7 +506,7 @@ param(
                 return $true
             }
             'cline' {
-                Add-Notice 'Cline: hooks are not supported on Windows, so there is no reminder hook.'
+                Add-Notice 'Cline: hooks are not supported on Windows, so there are no reminder or alert hooks.'
                 return $false
             }
             { $_ -in @('opencode', 'amp') } {
@@ -503,9 +514,83 @@ param(
                 return $true
             }
             'copilot' {
-                Add-Notice "Copilot CLI: rules installed; Copilot ignores prompt-hook output, so there is no reminder hook."
+                Add-Notice 'Copilot CLI: Copilot ignores prompt-hook output, so there is no reminder hook.'
                 return $false
             }
+            default { throw "unknown harness '$Name'" }
+        }
+    }
+
+    # Layer 4: three beeps when the agent asks for permission, asks a question, or finishes its
+    # turn, using each harness's own events. OpenCode and Amp get it from their plugin.
+    function Register-Alerts {
+        param([string]$Name)
+        $harnessHome = Get-HarnessHome $Name
+        $alert = Get-AlertCommand $Name
+        switch ($Name) {
+            'claude' {
+                return Update-HookConfig ([System.IO.Path]::Combine($harnessHome, 'settings.json')) @(
+                    (New-Registration 'Notification' 'permission_prompt' $alert),
+                    (New-Registration 'PreToolUse' 'AskUserQuestion' $alert),
+                    (New-Registration 'Stop' '' $alert)
+                )
+            }
+            'codex' {
+                return Update-HookConfig ([System.IO.Path]::Combine($harnessHome, 'hooks.json')) @(
+                    (New-Registration 'PermissionRequest' '' $alert),
+                    (New-Registration 'PreToolUse' '^request_user_input$' $alert),
+                    (New-Registration 'Stop' '' $alert)
+                )
+            }
+            'gemini' {
+                # Gemini's Notification event covers both permission prompts and questions.
+                return Update-HookConfig ([System.IO.Path]::Combine($harnessHome, 'settings.json')) @(
+                    (New-Registration 'Notification' '' $alert),
+                    (New-Registration 'AfterAgent' '' $alert)
+                )
+            }
+            'devin' {
+                return Update-HookConfig (Get-DevinHooksFile) @(
+                    (New-Registration 'PermissionRequest' '' $alert),
+                    (New-Registration 'PreToolUse' '^ask_user_question$' $alert),
+                    (New-Registration 'Stop' '' $alert)
+                )
+            }
+            'kiro' {
+                # Kiro has no permission or question event; only the end of the turn beeps.
+                $hookFile = [System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier-alert.json')
+                Write-JsonConfig $hookFile ([pscustomobject]@{
+                    version = 'v1'
+                    hooks = [object[]]@(
+                        [pscustomobject]@{
+                            name = 'unlazier-alert'; trigger = 'Stop'
+                            action = [pscustomobject]@{ type = 'command'; command = $alert }
+                            timeout = 10
+                        }
+                    )
+                })
+                return $true
+            }
+            'copilot' {
+                $hookFile = [System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier.json')
+                Write-JsonConfig $hookFile ([pscustomobject]@{
+                    version = 1
+                    hooks = [pscustomobject]@{
+                        notification = [object[]]@(
+                            [pscustomobject]@{
+                                matcher = 'permission_prompt|elicitation_dialog'; type = 'command'
+                                powershell = $alert; timeoutSec = 10
+                            }
+                        )
+                        agentStop = [object[]]@(
+                            [pscustomobject]@{ type = 'command'; powershell = $alert; timeoutSec = 10 }
+                        )
+                    }
+                })
+                return $true
+            }
+            # Windows has no Cline hooks (see Register-Hooks); OpenCode and Amp use their plugin.
+            { $_ -in @('cline', 'opencode', 'amp') } { return $false }
             default { throw "unknown harness '$Name'" }
         }
     }
@@ -518,12 +603,16 @@ param(
             'gemini' { Clear-HookConfig ([System.IO.Path]::Combine($harnessHome, 'settings.json')) $false }
             'codex' { Clear-HookConfig ([System.IO.Path]::Combine($harnessHome, 'hooks.json')) $false }
             'devin' { Clear-HookConfig (Get-DevinHooksFile) $false }
-            'kiro' { Remove-FileIfPresent ([System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier-ai.json')) }
-            { $_ -in @('opencode', 'amp') } {
-                Remove-FileIfPresent ([System.IO.Path]::Combine($harnessHome, 'plugins', 'unlazier-ai.ts'))
+            'kiro' {
+                Remove-FileIfPresent ([System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier.json'))
+                Remove-FileIfPresent ([System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier-alert.json'))
             }
-            # Nothing was registered for these on Windows.
-            { $_ -in @('cline', 'copilot') } { }
+            { $_ -in @('opencode', 'amp') } {
+                Remove-FileIfPresent ([System.IO.Path]::Combine($harnessHome, 'plugins', 'unlazier.ts'))
+            }
+            'copilot' { Remove-FileIfPresent ([System.IO.Path]::Combine($harnessHome, 'hooks', 'unlazier.json')) }
+            # Nothing was registered for Cline on Windows.
+            'cline' { }
             default { throw "unknown harness '$Name'" }
         }
     }
@@ -540,7 +629,7 @@ param(
         $pluginDirectory = [System.IO.Path]::Combine((Get-HarnessHome $Name), 'plugins')
         [void][System.IO.Directory]::CreateDirectory($pluginDirectory)
         $source = [System.IO.Path]::Combine($State.SourceDirectory, 'plugins', "$Name.ts")
-        Copy-Item -LiteralPath $source -Destination ([System.IO.Path]::Combine($pluginDirectory, 'unlazier-ai.ts')) -Force
+        Copy-Item -LiteralPath $source -Destination ([System.IO.Path]::Combine($pluginDirectory, 'unlazier.ts')) -Force
     }
 
     # Claude Code passes usage windows only to the status line, so the status line is the usage
@@ -582,9 +671,9 @@ param(
     }
 
     function Test-HasMarker {
-        param([string]$Text)
+        param([string]$Text, [string]$Start = $MarkerStart)
         foreach ($line in ($Text -split "`n")) {
-            if ($line.TrimEnd("`r") -eq $MarkerStart) {
+            if ($line.TrimEnd("`r") -eq $Start) {
                 return $true
             }
         }
@@ -594,18 +683,18 @@ param(
     # Replaces the lines from the start marker to the end marker with $Block, or drops them when
     # $Block is $null. Every other line keeps its exact bytes, including CRLF endings.
     function Set-MarkedBlock {
-        param([string]$Text, $Block)
+        param([string]$Text, $Block, [string]$Start = $MarkerStart, [string]$End = $MarkerEnd)
         $result = New-Object System.Collections.Generic.List[string]
         $isSkipping = $false
         foreach ($line in ($Text -split "`n")) {
             $bareLine = $line.TrimEnd("`r")
             if ($isSkipping) {
-                if ($bareLine -eq $MarkerEnd) {
+                if ($bareLine -eq $End) {
                     $isSkipping = $false
                 }
                 continue
             }
-            if ($bareLine -eq $MarkerStart) {
+            if ($bareLine -eq $Start) {
                 if ($null -ne $Block) {
                     $result.Add($Block)
                 }
@@ -638,17 +727,18 @@ param(
         Write-TextFile $Path ($file.Text + $separator + $block + "`n") $file.HasBom
     }
 
-    # Removes the block; deletes the file when only whitespace is left.
+    # Removes the block (marked with the current markers unless others are given); deletes the
+    # file when only whitespace is left.
     function Remove-RulesBlock {
-        param([string]$Path)
+        param([string]$Path, [string]$Start = $MarkerStart, [string]$End = $MarkerEnd)
         if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
             return
         }
         $file = Read-TextFile $Path
-        if (-not (Test-HasMarker $file.Text)) {
+        if (-not (Test-HasMarker $file.Text $Start)) {
             return
         }
-        $remaining = Set-MarkedBlock $file.Text $null
+        $remaining = Set-MarkedBlock $file.Text $null $Start $End
         if ([string]::IsNullOrWhiteSpace($remaining)) {
             Remove-Item -LiteralPath $Path -Force
             return
@@ -656,14 +746,14 @@ param(
         Write-TextFile $Path $remaining $file.HasBom
     }
 
-    # Our files are recognized by the "unlazier-ai" prefix; the pattern also covers the single
-    # unlazier-ai.md and the two split files that version 2.0 wrote to these folders.
+    # Our files are recognized by the "unlazier" prefix; the pattern also covers the
+    # unlazier-ai*.md files that version 2.0 wrote to these folders.
     function Remove-RuleFiles {
         param([string]$Folder)
         if (-not (Test-Path -LiteralPath $Folder -PathType Container)) {
             return
         }
-        Get-ChildItem -LiteralPath $Folder -File -Filter 'unlazier-ai*.md' | ForEach-Object {
+        Get-ChildItem -LiteralPath $Folder -File -Filter 'unlazier*.md' | ForEach-Object {
             Remove-Item -LiteralPath $_.FullName -Force
         }
     }
@@ -673,10 +763,10 @@ param(
         Remove-RuleFiles $Folder
         [void][System.IO.Directory]::CreateDirectory($Folder)
         Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'AGENTS.md')) `
-            -Destination ([System.IO.Path]::Combine($Folder, 'unlazier-ai-principles.md')) -Force
+            -Destination ([System.IO.Path]::Combine($Folder, 'unlazier-principles.md')) -Force
         foreach ($name in $RuleNames) {
             Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'rules', "$name.md")) `
-                -Destination ([System.IO.Path]::Combine($Folder, "unlazier-ai-$name.md")) -Force
+                -Destination ([System.IO.Path]::Combine($Folder, "unlazier-$name.md")) -Force
         }
     }
 
@@ -689,12 +779,8 @@ param(
             Write-Log "  rules      -> $file"
             return
         }
-        # Version 2.0 put the Claude Code rules in a block inside CLAUDE.md.
-        if ($Name -eq 'claude') {
-            Remove-RulesBlock ([System.IO.Path]::Combine((Get-HarnessHome 'claude'), 'CLAUDE.md'))
-        }
         Write-RuleFiles $folder
-        Write-Log "  rules      -> $([System.IO.Path]::Combine($folder, 'unlazier-ai-*.md'))"
+        Write-Log "  rules      -> $([System.IO.Path]::Combine($folder, 'unlazier-*.md'))"
     }
 
     function Uninstall-Rules {
@@ -704,18 +790,44 @@ param(
             Remove-RulesBlock (Get-RulesFile $Name)
             return
         }
-        if ($Name -eq 'claude') {
-            Remove-RulesBlock ([System.IO.Path]::Combine((Get-HarnessHome 'claude'), 'CLAUDE.md'))
-        }
         Remove-RuleFiles $folder
     }
 
-    # Copies the files the hook reads into <harness home>\unlazier-ai\.
+    # Removes what version 2.0 installed under its old name, so it does not load next to the
+    # renamed files. Hook entries, the status line, and rule files need nothing extra: their
+    # names contain "unlazier", which matches both names.
+    function Remove-LegacyNames {
+        param([string]$Name)
+        $harnessHome = Get-HarnessHome $Name
+        $folder = Get-RulesFolder $Name
+        if (-not $folder) {
+            Remove-RulesBlock (Get-RulesFile $Name) $LegacyMarkerStart $LegacyMarkerEnd
+        } elseif ($Name -eq 'claude') {
+            # Version 2.0 put the Claude Code rules in a block inside CLAUDE.md.
+            Remove-RulesBlock ([System.IO.Path]::Combine($harnessHome, 'CLAUDE.md')) $LegacyMarkerStart $LegacyMarkerEnd
+        }
+        $legacyFiles = @()
+        switch ($Name) {
+            { $_ -in @('opencode', 'amp') } { $legacyFiles = @([System.IO.Path]::Combine($harnessHome, 'plugins', "$LegacyName.ts")) }
+            'kiro' { $legacyFiles = @([System.IO.Path]::Combine($harnessHome, 'hooks', "$LegacyName.json")) }
+        }
+        foreach ($path in $legacyFiles) {
+            if (Test-Path -LiteralPath $path -PathType Leaf) {
+                Remove-Item -LiteralPath $path -Force
+            }
+        }
+        $legacyFolder = [System.IO.Path]::Combine($harnessHome, $LegacyName)
+        if (Test-Path -LiteralPath $legacyFolder -PathType Container) {
+            Remove-Item -LiteralPath $legacyFolder -Recurse -Force
+        }
+    }
+
+    # Copies the files the hook reads into <harness home>\unlazier\.
     function Install-Payload {
         param([string]$Name)
         $target = [System.IO.Path]::Combine((Get-HarnessHome $Name), $PayloadDirectoryName)
         [void][System.IO.Directory]::CreateDirectory($target)
-        $files = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1')
+        $files = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1', 'hooks/alert.ps1')
         foreach ($relativePath in $files) {
             $source = [System.IO.Path]::Combine($State.SourceDirectory, $relativePath)
             Copy-Item -LiteralPath $source -Destination ([System.IO.Path]::Combine($target, (Split-Path -Leaf $relativePath))) -Force
@@ -816,7 +928,7 @@ param(
             return
         }
         Write-Log ''
-        Write-Log 'Files from Unlazier AI version 1 were found:'
+        Write-Log 'Files from Unlazier version 1 were found:'
         foreach ($path in $Leftovers) {
             Write-Log "  - $path"
         }
@@ -838,10 +950,10 @@ param(
     # Interaction and setup.
     # -----------------------------------------------------------------------
 
-    # Returns the typed line, or $null when nobody can answer. UNLAZIER_AI_NO_PROMPT=1 behaves
+    # Returns the typed line, or $null when nobody can answer. UNLAZIER_NO_PROMPT=1 behaves
     # as if no terminal were attached (used by automation and tests).
     function Read-Answer {
-        if ([Environment]::GetEnvironmentVariable('UNLAZIER_AI_NO_PROMPT') -eq '1') {
+        if ([Environment]::GetEnvironmentVariable('UNLAZIER_NO_PROMPT') -eq '1') {
             return $null
         }
         try {
@@ -886,7 +998,7 @@ param(
 
         [string[]]$detected = @($AllHarnesses | Where-Object { Test-HarnessDetected $_ })
         Write-Log ''
-        Write-Log "Choose the tools to $mode Unlazier AI for (* = found on this computer):"
+        Write-Log "Choose the tools to $mode Unlazier for (* = found on this computer):"
         for ($index = 0; $index -lt $AllHarnesses.Count; $index++) {
             $marker = ' '
             if ($detected -contains $AllHarnesses[$index]) {
@@ -940,9 +1052,9 @@ param(
         # Windows PowerShell 5.1 may still default to TLS 1.0, which GitHub refuses.
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor
             [System.Net.SecurityProtocolType]::Tls12
-        $State.DownloadDirectory = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "unlazier-ai-$([guid]::NewGuid())")
+        $State.DownloadDirectory = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "unlazier-$([guid]::NewGuid())")
         $State.SourceDirectory = $State.DownloadDirectory
-        Write-Log "Downloading Unlazier AI from $RawBase..."
+        Write-Log "Downloading Unlazier from $RawBase..."
         $relativePaths = $PayloadFiles + @($RuleNames | ForEach-Object { "rules/$_.md" })
         foreach ($relativePath in $relativePaths) {
             $destination = [System.IO.Path]::Combine($State.DownloadDirectory, $relativePath)
@@ -985,11 +1097,21 @@ param(
         Write-Log ''
         Write-Log "$(Get-HarnessLabel $Name):"
         Add-HarnessWarnings $Name
+        Remove-LegacyNames $Name
         Install-Payload $Name
         Install-Rules $Name
-        $isRegistered = Register-Hooks $Name
-        if ($isRegistered -and $Name -notin @('opencode', 'amp')) {
-            Write-Log '  reminder   -> hook registered'
+        if ($Name -in @('opencode', 'amp')) {
+            # One plugin carries both the reminder and the alerts.
+            [void](Register-Hooks $Name)
+            Write-Log '  reminder   -> plugin'
+            Write-Log '  alerts     -> plugin'
+        } else {
+            if (Register-Hooks $Name) {
+                Write-Log '  reminder   -> hook registered'
+            }
+            if (Register-Alerts $Name) {
+                Write-Log '  alerts     -> hook registered'
+            }
         }
         if ($Name -eq 'claude' -and (Install-StatusLine)) {
             Write-Log '  usage      -> status line'
@@ -1000,6 +1122,7 @@ param(
         param([string]$Name)
         Write-Log ''
         Write-Log "$(Get-HarnessLabel $Name):"
+        Remove-LegacyNames $Name
         Uninstall-Rules $Name
         Unregister-Hooks $Name
         Remove-Payload $Name
