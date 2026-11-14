@@ -147,14 +147,15 @@ Revert to full clarity temporarily for: security warnings, irreversible action c
 
 ## Detailed Rules by Topic
 
-For language-agnostic code quality rules organized by topic, read the relevant file from `rules/` when working on a related task:
+The following topic rules are loaded together with these principles and apply to every task:
 
-- `rules/structure.md` — Structure and Organization
-- `rules/correctness.md` — Correctness and Robustness
-- `rules/style.md` — Style and Consistency
-- `rules/completeness.md` — Completeness
-- `rules/performance.md` — Performance
-- `rules/testability.md` — Testability
-- `rules/async.md` — Async and Concurrency
-- `rules/naming.md` — Naming and Language Idioms
-- `rules/documentation.md` — Documentation Standards
+- Structure and Organization
+- Correctness and Robustness
+- Style and Consistency
+- Completeness
+- Performance
+- Testability
+- Async and Concurrency
+- Naming and Language Idioms
+- Documentation Standards
+- Agent Parallelism
