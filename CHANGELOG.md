@@ -1,17 +1,23 @@
 # Changelog
 
-All notable changes to Unlazier AI are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to Unlazier (called Unlazier AI before version 2.1) are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [2.1.0] - 2026-11-14
 
+### Added
+
+- **Alerts layer:** three short beeps when the assistant asks for permission, asks a question, or finishes its turn, through each tool's own events. Kiro and Amp signal only the end of a turn, and Cline signals no permission prompts.
+
 ### Changed
 
+- **Renamed from Unlazier AI to Unlazier.** Files, folders, and markers use `unlazier` instead of `unlazier-ai`, and the repository moves to `fco3lho/unlazier`. Installing again removes everything version 2.0 wrote under the old name.
 - **Rules go into the tool's rules folder, one small file per rule**, for tools that always load such a folder: Claude Code (`~/.claude/rules/`), Devin, Kiro, and Cline. Anthropic recommends keeping each CLAUDE.md under 200 lines, and version 2.0 added about 480 lines to it. Your `CLAUDE.md` is no longer touched. Tools that read a single instructions file (Codex CLI, OpenCode, Copilot CLI, Gemini CLI, Amp) keep the marked block.
 - **Upgrading from 2.0 is automatic:** installing again removes the block from `CLAUDE.md` and the old rule files in the Kiro, Cline, and Devin folders, then writes the new files.
+- The Claude Code status line shows reset times longer than a day in days, for example `3d 11h 30m`.
 
 ### Fixed
 
-- The Claude Code status line script is copied only when Unlazier AI actually installs the status line, instead of on every install.
+- The Claude Code status line script is copied only when Unlazier actually installs the status line, instead of on every install.
 
 ## [2.0.0] - 2026-11-14
 
