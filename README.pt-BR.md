@@ -2,7 +2,7 @@
   <img src="docs/images/sloth.png" alt="Sloth" width="250">
 </p>
 
-# <p align="center">Unlazier AI</p>
+# <p align="center">Unlazier</p>
 
 <p align="center">
   <a href="README.md">English</a> | <b>Português (Brasil)</b> | <a href="README.es.md">Español</a>
@@ -12,7 +12,7 @@
 
 Assistentes de IA para programação são poderosos, mas costumam pegar atalhos. Eles adivinham o que você quis dizer em vez de perguntar, escrevem mais código do que o necessário, mexem em coisas que você não pediu e deixam trabalho pela metade.
 
-O Unlazier AI é um conjunto de regras que faz esses assistentes trabalharem com mais cuidado. Você instala uma vez, e todas as ferramentas de IA para programação que você usa passam a seguir as mesmas regras em todos os projetos.
+O Unlazier é um conjunto de regras que faz esses assistentes trabalharem com mais cuidado. Você instala uma vez, e todas as ferramentas de IA para programação que você usa passam a seguir as mesmas regras em todos os projetos.
 
 ## Índice
 
@@ -21,6 +21,7 @@ O Unlazier AI é um conjunto de regras que faz esses assistentes trabalharem com
 - [Instalação](#instalação)
 - [O que muda no seu computador](#o-que-muda-no-seu-computador)
 - [Limites de uso e trabalho em paralelo](#limites-de-uso-e-trabalho-em-paralelo)
+- [Alertas sonoros](#alertas-sonoros)
 - [Desinstalação](#desinstalação)
 - [Atualizando da versão 1](#atualizando-da-versão-1)
 - [Notas para cada ferramenta](#notas-para-cada-ferramenta)
@@ -31,29 +32,30 @@ O Unlazier AI é um conjunto de regras que faz esses assistentes trabalharem com
 
 ## O que você ganha
 
-O Unlazier AI adiciona três camadas a cada ferramenta. Todas as ferramentas recebem as mesmas três camadas; só muda o lugar onde cada uma guarda as próprias configurações.
+O Unlazier adiciona quatro camadas a cada ferramenta. Todas as ferramentas recebem as mesmas quatro camadas; só muda o lugar onde cada uma guarda as próprias configurações.
 
 | Camada | O que faz | Por que importa |
 |--------|-----------|-----------------|
 | **1. Regras** | Coloca as regras na pasta de regras da ferramenta, um arquivo pequeno por regra, ou no arquivo de instruções globais quando a ferramenta não tem pasta de regras. O assistente as lê no início de cada sessão. | O assistente sabe o que se espera dele desde a primeira mensagem. |
 | **2. Lembrete** | Reenvia um resumo curto das regras a cada mensagem sua, e os princípios principais de novo depois que a conversa é compactada. | Em sessões longas, as instruções do início perdem peso conforme a conversa cresce. O lembrete mantém as regras frescas. |
 | **3. Uso** | Acrescenta ao lembrete uma linha dizendo quanto dos seus limites de uso de 5 horas e semanal já foi consumido. | O assistente pode rodar tarefas em paralelo quando há folga e desacelerar antes de você atingir um limite. |
+| **4. Alertas** | Toca três bipes curtos quando o assistente pede sua permissão, faz uma pergunta ou termina a vez dele. | Você pode fazer outra coisa enquanto ele trabalha e voltar quando ele precisar de você. |
 
 ## Ferramentas suportadas
 
-| Ferramenta | 1. Regras | 2. Lembrete | 3. Uso |
-|------------|:---------:|:-----------:|:------:|
-| Claude Code | Sim | Sim | Sim, pela status line |
-| Codex CLI | Sim | Sim (precisa de uma aprovação, veja as [notas](#codex-cli)) | Sim, lido do próprio log de sessão do Codex |
-| Gemini CLI | Sim | Sim | Não disponível |
-| Devin Desktop (antigo Windsurf) | Sim | Sim | Não disponível |
-| Kiro | Sim | Sim | Não disponível |
-| Cline | Sim | Sim no Linux e no macOS (precisa de uma configuração, veja as [notas](#cline)) | Não disponível |
-| OpenCode | Sim | Sim | Não disponível |
-| Amp | Sim | Sim | Não disponível |
-| GitHub Copilot CLI | Sim | Não disponível | Não disponível |
+| Ferramenta | 1. Regras | 2. Lembrete | 3. Uso | 4. Alertas |
+|------------|:---------:|:-----------:|:------:|:----------:|
+| Claude Code | Sim | Sim | Sim, pela status line | Sim |
+| Codex CLI | Sim | Sim (precisa de uma aprovação, veja as [notas](#codex-cli)) | Sim, lido do próprio log de sessão do Codex | Sim (mesma aprovação) |
+| Gemini CLI | Sim | Sim | Não disponível | Sim |
+| Devin Desktop (antigo Windsurf) | Sim | Sim | Não disponível | Sim |
+| Kiro | Sim | Sim | Não disponível | Só no fim da vez |
+| Cline | Sim | Sim no Linux e no macOS (precisa de uma configuração, veja as [notas](#cline)) | Não disponível | Perguntas e fim da tarefa, no Linux e no macOS |
+| OpenCode | Sim | Sim | Não disponível | Sim |
+| Amp | Sim | Sim | Não disponível | Só no fim da vez |
+| GitHub Copilot CLI | Sim | Não disponível | Não disponível | Sim |
 
-"Não disponível" sempre significa que a própria ferramenta não oferece um jeito de fazer aquilo: o Copilot CLI ignora o que um hook de prompt imprime, e só o Claude Code e o Codex expõem os limites de uso num formato que um programa consegue ler. O Cursor não é suportado porque guarda as regras globais nas próprias configurações, e não num arquivo.
+"Não disponível" ou uma entrada parcial sempre significa que a própria ferramenta não oferece um jeito de fazer aquilo: o Copilot CLI ignora o que um hook de prompt imprime, só o Claude Code e o Codex expõem os limites de uso num formato que um programa consegue ler, o Kiro e o Amp só avisam o fim da vez, e o Cline não avisa pedidos de permissão. O Cursor não é suportado porque guarda as regras globais nas próprias configurações, e não num arquivo.
 
 ## Instalação
 
@@ -62,7 +64,7 @@ O Unlazier AI adiciona três camadas a cada ferramenta. Todas as ferramentas rec
 Abra um terminal e rode:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier/main/install.sh | bash
 ```
 
 As camadas de lembrete e de uso precisam do **jq**, uma pequena ferramenta de JSON. Se ele não estiver instalado, o instalador instala as regras mesmo assim e mostra o comando exato para instalar o jq no seu sistema (por exemplo `brew install jq` no macOS ou `sudo apt-get install -y jq` no Ubuntu). Instale o jq e rode o instalador de novo.
@@ -72,7 +74,7 @@ As camadas de lembrete e de uso precisam do **jq**, uma pequena ferramenta de JS
 Abra o **PowerShell** e rode:
 
 ```powershell
-irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/fco3lho/unlazier/main/install.ps1 | iex
 ```
 
 No Windows não é preciso instalar mais nada.
@@ -82,7 +84,7 @@ No Windows não é preciso instalar mais nada.
 O instalador mostra uma lista numerada com todas as ferramentas suportadas e marca com `*` as que encontrou no seu computador. As mensagens do instalador aparecem em inglês:
 
 ```
-Choose the tools to install Unlazier AI for (* = found on this computer):
+Choose the tools to install Unlazier for (* = found on this computer):
   1) * Claude Code
   2)   OpenCode
   3) * Codex CLI
@@ -101,12 +103,12 @@ Para escolher as ferramentas no próprio comando, o que é útil em scripts:
 ./install.sh --harness claude,codex
 
 # Linux and macOS, without downloading
-curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.sh | bash -s -- --harness claude,codex
+curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier/main/install.sh | bash -s -- --harness claude,codex
 ```
 
 ```powershell
 # Windows
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/install.ps1))) -Harness claude,codex
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/fco3lho/unlazier/main/install.ps1))) -Harness claude,codex
 ```
 
 Nomes das ferramentas: `claude`, `opencode`, `codex`, `copilot`, `gemini`, `amp`, `kiro`, `cline`, `devin` ou `all`. Acrescente `--yes` (no Windows: `-Yes`) para responder "sim" às perguntas automaticamente.
@@ -117,29 +119,29 @@ Depois de instalar, **reinicie suas ferramentas** para que elas carreguem as mud
 
 O instalador nunca substitui as suas configurações e nunca cria cópias de backup.
 
-- **Seus arquivos continuam seus.** As ferramentas que leem uma pasta de regras (Claude Code, Devin, Kiro, Cline) recebem arquivos próprios nela, todos com o nome `unlazier-ai-*.md`, e o seu arquivo de instruções não é alterado. As outras ferramentas leem um único arquivo de instruções, então as regras ficam dentro de um bloco marcado, que começa com `<!-- unlazier-ai:start -->` e termina com `<!-- unlazier-ai:end -->`; nada do que você escreveu fora desse bloco é alterado. Instalar de novo só atualiza esses arquivos e blocos.
+- **Seus arquivos continuam seus.** As ferramentas que leem uma pasta de regras (Claude Code, Devin, Kiro, Cline) recebem arquivos próprios nela, todos com o nome `unlazier-*.md`, e o seu arquivo de instruções não é alterado. As outras ferramentas leem um único arquivo de instruções, então as regras ficam dentro de um bloco marcado, que começa com `<!-- unlazier:start -->` e termina com `<!-- unlazier:end -->`; nada do que você escreveu fora desse bloco é alterado. Instalar de novo só atualiza esses arquivos e blocos.
 - **Os arquivos de configuração recebem acréscimos, não substituições.** Os hooks são adicionados ao lado dos que você já tem. Um arquivo de configuração que não pode ser lido com segurança (por exemplo, um com comentários) fica como está, e o instalador avisa você.
-- **Todo o resto fica numa pasta por ferramenta**, chamada `unlazier-ai`, ao lado das configurações da própria ferramenta.
+- **Todo o resto fica numa pasta por ferramenta**, chamada `unlazier`, ao lado das configurações da própria ferramenta.
 
 No Windows, `~` significa a sua pasta de usuário (`C:\Users\<você>`).
 
-| Ferramenta | Regras | Lembrete | Pasta |
+| Ferramenta | Regras | Lembrete e alertas | Pasta |
 |------------|--------|----------|-------|
-| Claude Code | `~/.claude/rules/unlazier-ai-*.md` | hooks em `~/.claude/settings.json`; status line se você não tiver uma | `~/.claude/unlazier-ai/` |
-| Codex CLI | `~/.codex/AGENTS.md` | `~/.codex/hooks.json` | `~/.codex/unlazier-ai/` |
-| Gemini CLI | `~/.gemini/GEMINI.md` | hook em `~/.gemini/settings.json` | `~/.gemini/unlazier-ai/` |
-| Devin Desktop | `~/.devin/rules/unlazier-ai-*.md` | hook em `~/.config/devin/config.json` (Windows: `%APPDATA%\devin\config.json`) | `~/.devin/unlazier-ai/` |
-| Kiro | `~/.kiro/steering/unlazier-ai-*.md` | `~/.kiro/hooks/unlazier-ai.json` | `~/.kiro/unlazier-ai/` |
-| Cline | `~/Documents/Cline/Rules/unlazier-ai-*.md` | `~/Documents/Cline/Hooks/UserPromptSubmit` | `~/Documents/Cline/unlazier-ai/` |
-| OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/plugins/unlazier-ai.ts` | `~/.config/opencode/unlazier-ai/` |
-| Amp | `~/.config/amp/AGENTS.md` | `~/.config/amp/plugins/unlazier-ai.ts` | `~/.config/amp/unlazier-ai/` |
-| GitHub Copilot CLI | `~/.copilot/copilot-instructions.md` | nenhum | `~/.copilot/unlazier-ai/` |
+| Claude Code | `~/.claude/rules/unlazier-*.md` | hooks em `~/.claude/settings.json`; status line se você não tiver uma | `~/.claude/unlazier/` |
+| Codex CLI | `~/.codex/AGENTS.md` | `~/.codex/hooks.json` | `~/.codex/unlazier/` |
+| Gemini CLI | `~/.gemini/GEMINI.md` | hook em `~/.gemini/settings.json` | `~/.gemini/unlazier/` |
+| Devin Desktop | `~/.devin/rules/unlazier-*.md` | hook em `~/.config/devin/config.json` (Windows: `%APPDATA%\devin\config.json`) | `~/.devin/unlazier/` |
+| Kiro | `~/.kiro/steering/unlazier-*.md` | `~/.kiro/hooks/unlazier.json` e `unlazier-alert.json` | `~/.kiro/unlazier/` |
+| Cline | `~/Documents/Cline/Rules/unlazier-*.md` | `UserPromptSubmit`, `PreToolUse` e `TaskComplete` em `~/Documents/Cline/Hooks/` | `~/Documents/Cline/unlazier/` |
+| OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/plugins/unlazier.ts` | `~/.config/opencode/unlazier/` |
+| Amp | `~/.config/amp/AGENTS.md` | `~/.config/amp/plugins/unlazier.ts` | `~/.config/amp/unlazier/` |
+| GitHub Copilot CLI | `~/.copilot/copilot-instructions.md` | `~/.copilot/hooks/unlazier.json` (só alertas) | `~/.copilot/unlazier/` |
 
 Se você mudou o lugar das configurações de uma ferramenta com a variável de ambiente dela (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `KIRO_HOME`), o instalador usa esse lugar.
 
 ## Limites de uso e trabalho em paralelo
 
-Assinaturas como as do Claude e do ChatGPT limitam quanto você pode usar numa janela de 5 horas e numa semana. O Unlazier AI diz ao assistente como dosar o ritmo:
+Assinaturas como as do Claude e do ChatGPT limitam quanto você pode usar numa janela de 5 horas e numa semana. O Unlazier diz ao assistente como dosar o ritmo:
 
 | Janela de 5 horas | O que o assistente faz |
 |-------------------|------------------------|
@@ -154,7 +156,14 @@ Quando paraleliza, ele prefere, nesta ordem: agentes auxiliares para partes da m
 
 **De onde vêm os números:**
 
-- **Claude Code** envia o uso só para a status line (a barra na parte de baixo da tela). Se você não tem status line, o instalador adiciona uma que mostra as duas janelas e as salva para o lembrete. Se você já tem a sua, ela é mantida. Para alimentar o lembrete, faça a sua status line salvar a parte `rate_limits` do que o Claude Code envia para ela em `~/.claude/state/rate_limits.json`, neste formato:
+- **Claude Code** envia o uso só para a status line (a barra na parte de baixo da tela). Se você não tem status line, o instalador adiciona uma que mostra as duas janelas e as salva para o lembrete:
+
+    ```
+    Session 5h: [██░░░░░░░░] 24% · resets in 2h 2m
+    Weekly    : [████░░░░░░] 38% · resets in 3d 11h 30m
+    ```
+
+    Se você já tem a sua, ela é mantida. Para alimentar o lembrete, faça a sua status line salvar a parte `rate_limits` do que o Claude Code envia para ela em `~/.claude/state/rate_limits.json`, neste formato:
 
     ```json
     {"captured_at": 1794668291, "five_hour": {"used_percentage": 24, "resets_at": 1794683400}, "seven_day": {"used_percentage": 60, "resets_at": 1794978000}}
@@ -166,21 +175,31 @@ Quando paraleliza, ele prefere, nesta ordem: agentes auxiliares para partes da m
 
 Uma leitura com mais de 15 minutos conta como desconhecida.
 
+## Alertas sonoros
+
+O Unlazier toca três bipes curtos quando o assistente precisa de você: quando pede permissão para fazer algo, quando faz uma pergunta e quando termina a vez dele. Você pode cuidar de outra coisa e voltar quando ouvir.
+
+- **Windows e WSL:** o bipe vem do Windows.
+- **macOS:** o som do sistema "Tink".
+- **Linux:** o som "button pressed" do ambiente gráfico, ou o sino do terminal quando não há player de som.
+
+Algumas ferramentas avisam menos momentos; veja a coluna Alertas em [Ferramentas suportadas](#ferramentas-suportadas).
+
 ## Desinstalação
 
 Linux e macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/fco3lho/unlazier/main/uninstall.sh | bash
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/fco3lho/unlazier-ai/main/uninstall.ps1 | iex
+irm https://raw.githubusercontent.com/fco3lho/unlazier/main/uninstall.ps1 | iex
 ```
 
-O desinstalador mostra o mesmo menu e remove só o que o Unlazier AI adicionou: os arquivos de regras `unlazier-ai-*.md`, os blocos marcados, os hooks, os plugins, a status line (só se for a que o Unlazier AI instalou) e as pastas `unlazier-ai`. Um arquivo que fica vazio depois que o bloco é removido é apagado. Suas configurações, seu histórico e suas credenciais continuam lá.
+O desinstalador mostra o mesmo menu e remove só o que o Unlazier adicionou: os arquivos de regras `unlazier-*.md`, os blocos marcados, os hooks, os plugins, a status line (só se for a que o Unlazier instalou) e as pastas `unlazier`. Um arquivo que fica vazio depois que o bloco é removido é apagado. Suas configurações, seu histórico e suas credenciais continuam lá.
 
 ## Atualizando da versão 1
 
@@ -188,7 +207,9 @@ A versão 1 copiava os arquivos dela por cima da sua configuração em `~/.claud
 
 O antigo `~/.claude/CLAUDE.md` (ou `~/.config/opencode/AGENTS.md`) é reconhecido pela primeira linha, `# Global Agent Rules`. Se você acrescentou anotações suas nele depois de instalar a versão 1, responda **não** e tire suas anotações de lá antes: a versão 1 substituía o arquivo inteiro, então o instalador não consegue separar as suas anotações das regras antigas.
 
-> **Não rode o desinstalador da versão 1.** Ele apagava as pastas `~/.claude` e `~/.config/opencode` inteiras, incluindo suas configurações e credenciais. O desinstalador da versão 2 remove só o que o Unlazier AI adicionou.
+A versão 2.0 se chamava Unlazier AI e usava `unlazier-ai` nos nomes de arquivos e pastas. Instalar de novo remove esses itens e grava os novos nomes `unlazier` no lugar.
+
+> **Não rode o desinstalador da versão 1.** Ele apagava as pastas `~/.claude` e `~/.config/opencode` inteiras, incluindo suas configurações e credenciais. O desinstalador da versão 2 remove só o que o Unlazier adicionou.
 
 ## Notas para cada ferramenta
 
@@ -200,7 +221,7 @@ O Claude Code pede que você confie numa pasta antes de rodar hooks nela; o lemb
 
 ### Codex CLI
 
-O Codex só roda um hook novo depois que você o aprova. Abra o Codex, digite `/hooks` e aprove os dois hooks do Unlazier AI uma única vez. Se existir um arquivo chamado `AGENTS.override.md` em `~/.codex`, o Codex ignora o `AGENTS.md`, e o instalador avisa você. Por padrão, o Codex lê no máximo 32 KiB de instruções no total; as regras do Unlazier AI ocupam cerca de 18 KiB, então instruções de projeto muito longas podem ser cortadas. Você pode aumentar o limite com `project_doc_max_bytes` em `~/.codex/config.toml`.
+O Codex só roda um hook novo depois que você o aprova. Abra o Codex, digite `/hooks` e aprove os hooks do Unlazier uma única vez. Se existir um arquivo chamado `AGENTS.override.md` em `~/.codex`, o Codex ignora o `AGENTS.md`, e o instalador avisa você. Por padrão, o Codex lê no máximo 32 KiB de instruções no total; as regras do Unlazier ocupam cerca de 18 KiB, então instruções de projeto muito longas podem ser cortadas. Você pode aumentar o limite com `project_doc_max_bytes` em `~/.codex/config.toml`.
 
 ### Gemini CLI
 
@@ -208,15 +229,15 @@ O Gemini reenvia o arquivo de instruções a cada mensagem, então não precisa 
 
 ### Devin Desktop (antigo Windsurf)
 
-O Devin limita cada arquivo de regras a 12.000 caracteres; cada arquivo de regra do Unlazier AI fica bem abaixo disso. O Devin também roda os hooks que encontra em `~/.claude/settings.json`; desligar isso desligaria também as suas regras do Claude Code dentro do Devin, então o Unlazier AI deixa como está. O Devin não documenta nenhum jeito de adicionar texto depois da compactação, então só o lembrete a cada mensagem é usado.
+O Devin limita cada arquivo de regras a 12.000 caracteres; cada arquivo de regra do Unlazier fica bem abaixo disso. O Devin também roda os hooks que encontra em `~/.claude/settings.json`; desligar isso desligaria também as suas regras do Claude Code dentro do Devin, então o Unlazier deixa como está. Com as duas ferramentas instaladas, você pode ouvir o bipe de fim da vez duas vezes no Devin. O Devin não documenta nenhum jeito de adicionar texto depois da compactação, então só o lembrete a cada mensagem é usado.
 
 ### Kiro
 
-O lembrete depois da compactação precisa do Kiro CLI 3.1.0 ou mais recente.
+O lembrete depois da compactação precisa do Kiro CLI 3.1.0 ou mais recente. O Kiro não oferece evento para pedidos de permissão nem para perguntas, então só bipa no fim da vez.
 
 ### Cline
 
-Os hooks vêm desligados. Ligue **Enable Hooks** nas Feature Settings do Cline. O Cline só suporta hooks no Linux e no macOS, então no Windows o Cline recebe as regras sem o lembrete.
+Os hooks vêm desligados. Ligue **Enable Hooks** nas Feature Settings do Cline. O Cline só suporta hooks no Linux e no macOS, então no Windows o Cline recebe as regras sem o lembrete e sem os alertas. O Cline não repassa pedidos de permissão para os hooks, então ele bipa nas perguntas e no fim da tarefa.
 
 ### OpenCode
 
@@ -224,11 +245,11 @@ O plugin funciona com o OpenCode 1.18.29 ou mais recente, incluindo a versão 2.
 
 ### Amp
 
-O plugin é carregado em threads novas. Numa thread em andamento, recarregue os plugins com `Ctrl+O` e depois `plugins: reload`.
+O plugin é carregado em threads novas. Numa thread em andamento, recarregue os plugins com `Ctrl+O` e depois `plugins: reload`. O Amp não oferece evento para pedidos de permissão nem para perguntas, então só bipa no fim da vez.
 
 ### GitHub Copilot CLI
 
-O Copilot ignora o que um hook de prompt imprime, então recebe as regras sem o lembrete. A extensão do Copilot no VS Code também pode ler `~/.claude/CLAUDE.md` quando a configuração `chat.useClaudeMdFile` está ligada, o que carregaria as regras duas vezes se você usar os dois.
+O Copilot ignora o que um hook de prompt imprime, então recebe as regras e os alertas sem o lembrete. A extensão do Copilot no VS Code também pode ler `~/.claude/CLAUDE.md` quando a configuração `chat.useClaudeMdFile` está ligada, o que carregaria as regras duas vezes se você usar os dois.
 
 ## As regras
 
@@ -262,8 +283,8 @@ O lembrete enviado a cada mensagem está em [`reminder.md`](reminder.md).
 
 ## Personalização
 
-- **Suas próprias regras globais:** escreva-as no arquivo de instruções da sua ferramenta (por exemplo `~/.claude/CLAUDE.md`), fora de qualquer bloco do Unlazier AI, ou em arquivos seus na pasta de regras com nomes que não comecem com `unlazier-ai`. Elas sobrevivem a atualizações e desinstalações.
-- **Mudar as regras do Unlazier AI:** edite os arquivos numa cópia deste repositório e rode `./install.sh` (ou `.\install.ps1`) a partir dessa cópia. Edições feitas direto nos arquivos `unlazier-ai-*.md` instalados ou dentro do bloco instalado são substituídas na próxima instalação.
+- **Suas próprias regras globais:** escreva-as no arquivo de instruções da sua ferramenta (por exemplo `~/.claude/CLAUDE.md`), fora de qualquer bloco do Unlazier, ou em arquivos seus na pasta de regras com nomes que não comecem com `unlazier`. Elas sobrevivem a atualizações e desinstalações.
+- **Mudar as regras do Unlazier:** edite os arquivos numa cópia deste repositório e rode `./install.sh` (ou `.\install.ps1`) a partir dessa cópia. Edições feitas direto nos arquivos `unlazier-*.md` instalados ou dentro do bloco instalado são substituídas na próxima instalação.
 - **Regras de projeto:** cada ferramenta também lê instruções da pasta do seu projeto (por exemplo `AGENTS.md` ou `CLAUDE.md`); elas valem por cima das regras globais.
 
 ## Para contribuidores
@@ -275,6 +296,7 @@ Organização do repositório:
 | `AGENTS.md`, `rules/` | As regras (camada 1). `CLAUDE.md` é um link para `AGENTS.md`. |
 | `reminder.md` | O lembrete curto (camada 2). |
 | `hooks/inject.sh`, `hooks/inject.ps1` | Imprime o lembrete e a linha de uso (camadas 2 e 3) no formato que cada ferramenta espera. |
+| `hooks/alert.sh`, `hooks/alert.ps1` | Toca os bipes de alerta (camada 4). |
 | `statusline/` | Status line do Claude Code que salva o uso para o lembrete. |
 | `plugins/` | Plugins do OpenCode e do Amp, que chamam o mesmo script de hook. |
 | `install.sh`, `install.ps1` | Instaladores; cada ferramenta é um adaptador numa mesma tabela. Os `uninstall.*` chamam os instaladores no modo de desinstalação. |
