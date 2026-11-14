@@ -1,0 +1,38 @@
+name: test
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    unix:
+        strategy:
+            matrix:
+                os: [ubuntu-latest, macos-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install jq on macOS
+              if: runner.os == 'macOS'
+              run: command -v jq || brew install jq
+            - name: Run installer tests
+              run: bash tests/install_test.sh
+
+    windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Run installer tests (Windows PowerShell 5.1)
+              shell: powershell
+              run: ./tests/install_test.ps1
+            - name: Run installer tests (PowerShell 7)
+              shell: pwsh
+              run: ./tests/install_test.ps1
+
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Run shellcheck
+              run: shellcheck install.sh uninstall.sh hooks/inject.sh statusline/claude-statusline.sh tests/install_test.sh
