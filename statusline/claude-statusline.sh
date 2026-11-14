@@ -1,11 +1,11 @@
 #!/bin/bash
-# Claude Code status line for Unlazier AI.
+# Claude Code status line for Unlazier.
 #
 # Claude Code sends the usage windows (5-hour and weekly) only to the status line command.
 # This script shows them and saves them to <claude home>/state/rate_limits.json, where the
-# Unlazier AI hook reads them to tell the agent its current usage.
+# Unlazier hook reads them to tell the agent its current usage.
 #
-# Installed at <claude home>/unlazier-ai/claude-statusline.sh; requires jq.
+# Installed at <claude home>/unlazier/claude-statusline.sh; requires jq.
 
 set -u
 
@@ -22,9 +22,12 @@ def bar($percent):
 def remaining($resets_at):
     if $resets_at == null then "?"
     else ([($resets_at - now | floor), 0] | max) as $seconds
-        | ($seconds / 3600 | floor) as $hours
+        | ($seconds / 86400 | floor) as $days
+        | (($seconds % 86400) / 3600 | floor) as $hours
         | (($seconds % 3600) / 60 | floor) as $minutes
-        | if $hours > 0 then "\($hours)h \($minutes)m" else "\($minutes)m" end
+        | if $days > 0 then "\($days)d \($hours)h \($minutes)m"
+          elif $hours > 0 then "\($hours)h \($minutes)m"
+          else "\($minutes)m" end
     end;
 def window($label; $data):
     if $data == null or $data.used_percentage == null then "\($label): no data"

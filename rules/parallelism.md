@@ -4,7 +4,7 @@
     1. Subagents for subtasks of the same main task.
     2. Different tasks of a single request (for example, the tasks of one issue).
     3. Two or more different requests, each with one or more main tasks.
-- **Read Usage First** — the injected Unlazier AI reminder carries a `Usage:` line with the 5-hour and weekly window percentages and their source. Check it before starting concurrent work and again after long-running steps. Report the reading and its source to the user when it changes your pace.
+- **Read Usage First** — the injected Unlazier reminder carries a `Usage:` line with the 5-hour and weekly window percentages and their source. Check it before starting concurrent work and again after long-running steps. Report the reading and its source to the user when it changes your pace.
 - **Follow the Usage Ladder** — scale concurrency to the 5-hour window:
 
     | 5-hour window | Behavior |

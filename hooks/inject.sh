@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unlazier AI context hook for Linux and macOS.
+# Unlazier context hook for Linux and macOS.
 #
 # Usage: inject.sh <harness> <prompt|compact>
 #   prompt   prints the short reminder and the usage line; runs on every user prompt.
@@ -8,7 +8,7 @@
 #
 # Rules loaded at session start lose weight as the context window fills, so the harness
 # calls this hook to place a compact copy near the end of the context. Installed at
-# <harness home>/unlazier-ai/inject.sh next to reminder.md and AGENTS.md; requires jq.
+# <harness home>/unlazier/inject.sh next to reminder.md and AGENTS.md; requires jq.
 
 set -u
 

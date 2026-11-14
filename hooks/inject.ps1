@@ -1,4 +1,4 @@
-# Unlazier AI context hook for Windows.
+# Unlazier context hook for Windows.
 #
 # Usage: inject.ps1 <harness> <prompt|compact>
 #   prompt   prints the short reminder and the usage line; runs on every user prompt.
@@ -7,7 +7,7 @@
 #
 # Rules loaded at session start lose weight as the context window fills, so the harness
 # calls this hook to place a compact copy near the end of the context. Installed at
-# <harness home>\unlazier-ai\inject.ps1 next to reminder.md and AGENTS.md. The output is
+# <harness home>\unlazier\inject.ps1 next to reminder.md and AGENTS.md. The output is
 # byte-for-byte the same as inject.sh. This file is kept ASCII-only because Windows
 # PowerShell 5.1 reads scripts without a byte order mark in the legacy code page.
 
