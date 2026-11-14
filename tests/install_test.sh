@@ -173,7 +173,7 @@ test_uninstall_restores_original_files() {
 }
 
 seed_v1_installation() {
-    local home="$1" name
+    local home="$1"
     mkdir -p "$home/.claude/rules" "$home/.claude/skills"
     sed "s|rules/|$home/.claude/rules/|g" "$FIXTURES_DIR/v1/AGENTS.md" > "$home/.claude/CLAUDE.md"
     cp "$FIXTURES_DIR/v1/rules/"*.md "$home/.claude/rules/"
@@ -183,10 +183,8 @@ seed_v1_installation() {
     printf 'mine\n' > "$home/.claude/skills/my-skill/SKILL.md"
     mkdir -p "$home/.config/opencode"
     cp "$FIXTURES_DIR/v1/opencode.json" "$home/.config/opencode/opencode.json"
-    for name in bugfix; do
-        mkdir -p "$home/.config/opencode/skills/$name"
-        cp "$FIXTURES_DIR/v1/skills/$name/SKILL.md" "$home/.config/opencode/skills/$name/"
-    done
+    mkdir -p "$home/.config/opencode/skills/bugfix"
+    cp "$FIXTURES_DIR/v1/skills/bugfix/SKILL.md" "$home/.config/opencode/skills/bugfix/"
 }
 
 test_v1_leftovers_removed_with_yes() {
