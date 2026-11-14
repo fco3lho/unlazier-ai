@@ -101,23 +101,32 @@ harness_binaries() {
     esac
 }
 
-# Prints "<file> <part>" lines: where the rules block goes and which part of the rules it holds.
-rule_targets() {
+# Harnesses that always load every file in a rules folder get one small file per rule there,
+# which keeps each file short (Claude Code recommends under 200 lines per file) and leaves the
+# user's own instructions file untouched. Prints nothing for the other harnesses.
+rules_folder() {
     local home
     home="$(harness_home "$1")"
     case "$1" in
-        claude) echo "$home/CLAUDE.md all" ;;
-        opencode|codex|amp) echo "$home/AGENTS.md all" ;;
-        copilot) echo "$home/copilot-instructions.md all" ;;
-        gemini) echo "$home/GEMINI.md all" ;;
-        kiro) echo "$home/steering/unlazier-ai.md all" ;;
-        cline) echo "$home/Rules/unlazier-ai.md all" ;;
-        # Devin limits each rules file to 12,000 characters, so the rules are split in two.
-        devin)
-            echo "$home/rules/unlazier-ai-principles.md principles"
-            echo "$home/rules/unlazier-ai-rules.md topics"
-            ;;
+        claude|devin) echo "$home/rules" ;;
+        kiro) echo "$home/steering" ;;
+        cline) echo "$home/Rules" ;;
+        # Copilot's instructions folder holds path-specific files, so it is not used.
+        opencode|codex|amp|copilot|gemini) ;;
         *) die "unknown harness '$1'" ;;
+    esac
+}
+
+# The single global instructions file that holds the rules block, for harnesses without a
+# rules folder.
+rules_file() {
+    local home
+    home="$(harness_home "$1")"
+    case "$1" in
+        opencode|codex|amp) echo "$home/AGENTS.md" ;;
+        copilot) echo "$home/copilot-instructions.md" ;;
+        gemini) echo "$home/GEMINI.md" ;;
+        *) die "'$1' uses a rules folder, not a single rules file" ;;
     esac
 }
 
@@ -305,6 +314,8 @@ install_statusline() {
             || add_notice "Claude Code: you already have a status line, so it was kept. To give the agent its usage, make it save the 'rate_limits' it receives to $home/state/rate_limits.json (see README)."
         return 1
     fi
+    cp "$SOURCE_DIR/statusline/claude-statusline.sh" "$home/$PAYLOAD_DIR_NAME/"
+    chmod +x "$home/$PAYLOAD_DIR_NAME/claude-statusline.sh"
     update_json_file "$settings" '.statusLine = {type: "command", command: $command}' \
         --arg command "bash \"$home/$PAYLOAD_DIR_NAME/claude-statusline.sh\""
 }
@@ -317,35 +328,27 @@ uninstall_statusline() {
 }
 
 # ---------------------------------------------------------------------------
-# Rules layer: a marked block inside the harness's instructions file.
+# Rules layer: one file per rule in a rules folder, or a marked block inside the
+# harness's single instructions file.
 # ---------------------------------------------------------------------------
 
-render_part() {
-    local part="$1" name
-    case "$part" in
-        principles) cat "$SOURCE_DIR/AGENTS.md" ;;
-        topics)
-            for name in $RULE_NAMES; do
-                echo
-                cat "$SOURCE_DIR/rules/$name.md"
-            done
-            ;;
-        all)
-            render_part principles
-            render_part topics
-            ;;
-        *) die "unknown rules part '$part'" ;;
-    esac
+render_rules() {
+    local name
+    cat "$SOURCE_DIR/AGENTS.md"
+    for name in $RULE_NAMES; do
+        echo
+        cat "$SOURCE_DIR/rules/$name.md"
+    done
 }
 
 # Replaces the block between the markers, or appends it when the file has none.
 write_block() {
-    local file="$1" part="$2" block_file temporary_file
+    local file="$1" block_file temporary_file
     mkdir -p "$(dirname "$file")"
     block_file="$(mktemp)"
     {
         echo "$MARKER_START"
-        render_part "$part"
+        render_rules
         echo "$MARKER_END"
     } > "$block_file"
 
@@ -383,6 +386,57 @@ remove_block() {
     fi
 }
 
+# Our files are recognized by the "unlazier-ai" prefix; the pattern also covers the single
+# unlazier-ai.md and the two split files that version 2.0 wrote to these folders.
+remove_rule_files() {
+    local folder="$1" file
+    for file in "$folder"/unlazier-ai*.md; do
+        if [ -f "$file" ]; then
+            rm -f "$file"
+        fi
+    done
+}
+
+write_rule_files() {
+    local folder="$1" name
+    remove_rule_files "$folder"
+    mkdir -p "$folder"
+    cp "$SOURCE_DIR/AGENTS.md" "$folder/unlazier-ai-principles.md"
+    for name in $RULE_NAMES; do
+        cp "$SOURCE_DIR/rules/$name.md" "$folder/unlazier-ai-$name.md"
+    done
+}
+
+install_rules() {
+    local harness="$1" folder file
+    folder="$(rules_folder "$harness")"
+    if [ -z "$folder" ]; then
+        file="$(rules_file "$harness")"
+        write_block "$file"
+        log "  rules      -> $file"
+        return 0
+    fi
+    # Version 2.0 put the Claude Code rules in a block inside CLAUDE.md.
+    if [ "$harness" = "claude" ]; then
+        remove_block "$(harness_home claude)/CLAUDE.md"
+    fi
+    write_rule_files "$folder"
+    log "  rules      -> $folder/unlazier-ai-*.md"
+}
+
+uninstall_rules() {
+    local harness="$1" folder
+    folder="$(rules_folder "$harness")"
+    if [ -z "$folder" ]; then
+        remove_block "$(rules_file "$harness")"
+        return 0
+    fi
+    if [ "$harness" = "claude" ]; then
+        remove_block "$(harness_home claude)/CLAUDE.md"
+    fi
+    remove_rule_files "$folder"
+}
+
 # Copies the files the hook reads into <harness home>/unlazier-ai/.
 install_payload() {
     local harness="$1" target
@@ -390,10 +444,6 @@ install_payload() {
     mkdir -p "$target"
     cp "$SOURCE_DIR/AGENTS.md" "$SOURCE_DIR/reminder.md" "$SOURCE_DIR/hooks/inject.sh" "$target/"
     chmod +x "$target/inject.sh"
-    if [ "$harness" = "claude" ]; then
-        cp "$SOURCE_DIR/statusline/claude-statusline.sh" "$target/"
-        chmod +x "$target/claude-statusline.sh"
-    fi
 }
 
 remove_payload() {
@@ -631,17 +681,12 @@ harness_warnings() {
 }
 
 install_harness() {
-    local harness="$1" file part
+    local harness="$1"
     log ""
     log "$(harness_label "$harness"):"
     harness_warnings "$harness"
     install_payload "$harness"
-    while read -r file part; do
-        write_block "$file" "$part"
-        log "  rules      -> $file"
-    done <<EOF
-$(rule_targets "$harness")
-EOF
+    install_rules "$harness"
     case "$harness" in
         opencode|amp|copilot)
             register_hooks "$harness"
@@ -658,14 +703,10 @@ EOF
 }
 
 uninstall_harness() {
-    local harness="$1" file part
+    local harness="$1"
     log ""
     log "$(harness_label "$harness"):"
-    while read -r file part; do
-        remove_block "$file"
-    done <<EOF
-$(rule_targets "$harness")
-EOF
+    uninstall_rules "$harness"
     case "$harness" in
         claude|codex|gemini|devin)
             if [ "$HAS_JQ" = true ]; then

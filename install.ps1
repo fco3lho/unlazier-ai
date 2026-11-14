@@ -153,33 +153,33 @@ param(
         }
     }
 
-    # Returns the files that hold the rules block and which part of the rules each one holds.
-    function Get-RuleTargets {
+    # Harnesses that always load every file in a rules folder get one small file per rule there,
+    # which keeps each file short (Claude Code recommends under 200 lines per file) and leaves the
+    # user's own instructions file untouched. Returns '' for the other harnesses.
+    function Get-RulesFolder {
         param([string]$Name)
         $harnessHome = Get-HarnessHome $Name
         switch ($Name) {
-            'claude' { return @(New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'CLAUDE.md')) 'all') }
-            { $_ -in @('opencode', 'codex', 'amp') } {
-                return @(New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'AGENTS.md')) 'all')
-            }
-            'copilot' { return @(New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'copilot-instructions.md')) 'all') }
-            'gemini' { return @(New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'GEMINI.md')) 'all') }
-            'kiro' { return @(New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'steering', 'unlazier-ai.md')) 'all') }
-            'cline' { return @(New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'Rules', 'unlazier-ai.md')) 'all') }
-            # Devin limits each rules file to 12,000 characters, so the rules are split in two.
-            'devin' {
-                return @(
-                    (New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'rules', 'unlazier-ai-principles.md')) 'principles'),
-                    (New-RuleTarget ([System.IO.Path]::Combine($harnessHome, 'rules', 'unlazier-ai-rules.md')) 'topics')
-                )
-            }
+            { $_ -in @('claude', 'devin') } { return [System.IO.Path]::Combine($harnessHome, 'rules') }
+            'kiro' { return [System.IO.Path]::Combine($harnessHome, 'steering') }
+            'cline' { return [System.IO.Path]::Combine($harnessHome, 'Rules') }
+            # Copilot's instructions folder holds path-specific files, so it is not used.
+            { $_ -in @('opencode', 'codex', 'amp', 'copilot', 'gemini') } { return '' }
             default { throw "unknown harness '$Name'" }
         }
     }
 
-    function New-RuleTarget {
-        param([string]$Path, [string]$Part)
-        return [pscustomobject]@{ Path = $Path; Part = $Part }
+    # The single global instructions file that holds the rules block, for harnesses without a
+    # rules folder.
+    function Get-RulesFile {
+        param([string]$Name)
+        $harnessHome = Get-HarnessHome $Name
+        switch ($Name) {
+            { $_ -in @('opencode', 'codex', 'amp') } { return [System.IO.Path]::Combine($harnessHome, 'AGENTS.md') }
+            'copilot' { return [System.IO.Path]::Combine($harnessHome, 'copilot-instructions.md') }
+            'gemini' { return [System.IO.Path]::Combine($harnessHome, 'GEMINI.md') }
+            default { throw "'$Name' uses a rules folder, not a single rules file" }
+        }
     }
 
     function Test-HarnessDetected {
@@ -560,29 +560,25 @@ param(
             return $false
         }
         $scriptPath = [System.IO.Path]::Combine($claudeHome, $PayloadDirectoryName, 'claude-statusline.ps1')
+        Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'statusline', 'claude-statusline.ps1')) `
+            -Destination $scriptPath -Force
         Set-JsonProperty $document 'statusLine' ([pscustomobject]@{ type = 'command'; command = (Get-ScriptCommand $scriptPath '') })
         Write-JsonConfig $settingsPath $document
         return $true
     }
 
     # -----------------------------------------------------------------------
-    # Rules layer: a marked block inside the harness's instructions file.
+    # Rules layer: one file per rule in a rules folder, or a marked block inside the
+    # harness's single instructions file.
     # -----------------------------------------------------------------------
 
     function Get-RulesText {
-        param([string]$Part)
-        switch ($Part) {
-            'principles' { return Read-SourceText 'AGENTS.md' }
-            'topics' {
-                $builder = New-Object System.Text.StringBuilder
-                foreach ($name in $RuleNames) {
-                    [void]$builder.Append("`n").Append((Read-SourceText "rules/$name.md"))
-                }
-                return $builder.ToString()
-            }
-            'all' { return (Get-RulesText 'principles') + (Get-RulesText 'topics') }
-            default { throw "unknown rules part '$Part'" }
+        $builder = New-Object System.Text.StringBuilder
+        [void]$builder.Append((Read-SourceText 'AGENTS.md'))
+        foreach ($name in $RuleNames) {
+            [void]$builder.Append("`n").Append((Read-SourceText "rules/$name.md"))
         }
+        return $builder.ToString()
     }
 
     function Test-HasMarker {
@@ -623,8 +619,8 @@ param(
 
     # Replaces the block between the markers, or appends it when the file has none.
     function Write-RulesBlock {
-        param([string]$Path, [string]$Part)
-        $block = $MarkerStart + "`n" + (Get-RulesText $Part) + $MarkerEnd
+        param([string]$Path)
+        $block = $MarkerStart + "`n" + (Get-RulesText) + $MarkerEnd
         if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
             Write-TextFile $Path ($block + "`n") $false
             return
@@ -660,15 +656,66 @@ param(
         Write-TextFile $Path $remaining $file.HasBom
     }
 
+    # Our files are recognized by the "unlazier-ai" prefix; the pattern also covers the single
+    # unlazier-ai.md and the two split files that version 2.0 wrote to these folders.
+    function Remove-RuleFiles {
+        param([string]$Folder)
+        if (-not (Test-Path -LiteralPath $Folder -PathType Container)) {
+            return
+        }
+        Get-ChildItem -LiteralPath $Folder -File -Filter 'unlazier-ai*.md' | ForEach-Object {
+            Remove-Item -LiteralPath $_.FullName -Force
+        }
+    }
+
+    function Write-RuleFiles {
+        param([string]$Folder)
+        Remove-RuleFiles $Folder
+        [void][System.IO.Directory]::CreateDirectory($Folder)
+        Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'AGENTS.md')) `
+            -Destination ([System.IO.Path]::Combine($Folder, 'unlazier-ai-principles.md')) -Force
+        foreach ($name in $RuleNames) {
+            Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'rules', "$name.md")) `
+                -Destination ([System.IO.Path]::Combine($Folder, "unlazier-ai-$name.md")) -Force
+        }
+    }
+
+    function Install-Rules {
+        param([string]$Name)
+        $folder = Get-RulesFolder $Name
+        if (-not $folder) {
+            $file = Get-RulesFile $Name
+            Write-RulesBlock $file
+            Write-Log "  rules      -> $file"
+            return
+        }
+        # Version 2.0 put the Claude Code rules in a block inside CLAUDE.md.
+        if ($Name -eq 'claude') {
+            Remove-RulesBlock ([System.IO.Path]::Combine((Get-HarnessHome 'claude'), 'CLAUDE.md'))
+        }
+        Write-RuleFiles $folder
+        Write-Log "  rules      -> $([System.IO.Path]::Combine($folder, 'unlazier-ai-*.md'))"
+    }
+
+    function Uninstall-Rules {
+        param([string]$Name)
+        $folder = Get-RulesFolder $Name
+        if (-not $folder) {
+            Remove-RulesBlock (Get-RulesFile $Name)
+            return
+        }
+        if ($Name -eq 'claude') {
+            Remove-RulesBlock ([System.IO.Path]::Combine((Get-HarnessHome 'claude'), 'CLAUDE.md'))
+        }
+        Remove-RuleFiles $folder
+    }
+
     # Copies the files the hook reads into <harness home>\unlazier-ai\.
     function Install-Payload {
         param([string]$Name)
         $target = [System.IO.Path]::Combine((Get-HarnessHome $Name), $PayloadDirectoryName)
         [void][System.IO.Directory]::CreateDirectory($target)
         $files = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1')
-        if ($Name -eq 'claude') {
-            $files += 'statusline/claude-statusline.ps1'
-        }
         foreach ($relativePath in $files) {
             $source = [System.IO.Path]::Combine($State.SourceDirectory, $relativePath)
             Copy-Item -LiteralPath $source -Destination ([System.IO.Path]::Combine($target, (Split-Path -Leaf $relativePath))) -Force
@@ -939,10 +986,7 @@ param(
         Write-Log "$(Get-HarnessLabel $Name):"
         Add-HarnessWarnings $Name
         Install-Payload $Name
-        foreach ($target in (Get-RuleTargets $Name)) {
-            Write-RulesBlock $target.Path $target.Part
-            Write-Log "  rules      -> $($target.Path)"
-        }
+        Install-Rules $Name
         $isRegistered = Register-Hooks $Name
         if ($isRegistered -and $Name -notin @('opencode', 'amp')) {
             Write-Log '  reminder   -> hook registered'
@@ -956,9 +1000,7 @@ param(
         param([string]$Name)
         Write-Log ''
         Write-Log "$(Get-HarnessLabel $Name):"
-        foreach ($target in (Get-RuleTargets $Name)) {
-            Remove-RulesBlock $target.Path
-        }
+        Uninstall-Rules $Name
         Unregister-Hooks $Name
         Remove-Payload $Name
         Write-Log '  removed'
