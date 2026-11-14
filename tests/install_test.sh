@@ -74,7 +74,24 @@ has_one_block() { [ "$(block_count "$1")" = "1" ]; }
 contains_line() { grep -qxF "$2" "$1"; }
 json_has() { [ "$(jq -r "$2" "$1")" = "true" ]; }
 file_absent() { [ ! -e "$1" ]; }
-shorter_than() { [ "$(wc -m < "$1")" -lt "$2" ]; }
+
+# Principles plus one file per topic rule.
+EXPECTED_RULE_FILES=11
+
+rule_file_count() {
+    find "$1" -maxdepth 1 -type f -name 'unlazier-ai*.md' | wc -l | tr -d ' '
+}
+
+has_all_rule_files() { [ "$(rule_file_count "$1")" = "$EXPECTED_RULE_FILES" ]; }
+
+# Every rule file stays below a character limit and a line limit.
+rule_files_within() {
+    local folder="$1" max_characters="$2" max_lines="$3" file
+    for file in "$folder"/unlazier-ai*.md; do
+        [ "$(wc -m < "$file")" -lt "$max_characters" ] || return 1
+        [ "$(wc -l < "$file")" -lt "$max_lines" ] || return 1
+    done
+}
 
 seed_user_configuration() {
     local home="$1"
@@ -97,12 +114,13 @@ test_install_preserves_user_content() {
     seed_user_configuration "$home"
     run_installer "$home" --harness "$ALL_HARNESSES" >/dev/null 2>&1
 
-    check "Claude notes kept" contains_line "$home/.claude/CLAUDE.md" "Always use tabs."
+    check "CLAUDE.md untouched" test "$(cat "$home/.claude/CLAUDE.md")" = "$(printf '# My notes\nAlways use tabs.')"
     check "Codex notes kept" contains_line "$home/.codex/AGENTS.md" "# Codex notes"
     check "existing Claude hook kept" json_has "$home/.claude/settings.json" \
         '[.hooks.Stop[].hooks[].command] | index("beep") != null'
     check "existing Claude status line kept" json_has "$home/.claude/settings.json" \
         '.statusLine.command == "my-status"'
+    check "unused status line script not copied" file_absent "$home/.claude/unlazier-ai/claude-statusline.sh"
     check "existing Codex hook kept" json_has "$home/.codex/hooks.json" \
         '[.hooks.UserPromptSubmit[].hooks[].command] | index("my-codex-hook") != null'
     check "Gemini setting kept" json_has "$home/.gemini/settings.json" '.theme == "dark"'
@@ -114,16 +132,18 @@ test_install_adds_all_layers() {
     home="$(new_home)"
     run_installer "$home" --harness "$ALL_HARNESSES" >/dev/null 2>&1
 
-    for file in .claude/CLAUDE.md .config/opencode/AGENTS.md .codex/AGENTS.md .copilot/copilot-instructions.md \
-        .gemini/GEMINI.md .config/amp/AGENTS.md .kiro/steering/unlazier-ai.md Documents/Cline/Rules/unlazier-ai.md \
-        .devin/rules/unlazier-ai-principles.md .devin/rules/unlazier-ai-rules.md; do
+    for file in .config/opencode/AGENTS.md .codex/AGENTS.md .copilot/copilot-instructions.md \
+        .gemini/GEMINI.md .config/amp/AGENTS.md; do
         check "rules block in $file" has_one_block "$home/$file"
     done
+    for file in .claude/rules .kiro/steering Documents/Cline/Rules .devin/rules; do
+        check "rule files in $file" has_all_rule_files "$home/$file"
+        check "rule files in $file are short" rule_files_within "$home/$file" 12000 200
+    done
+    check "no CLAUDE.md created" file_absent "$home/.claude/CLAUDE.md"
     for file in .claude .config/opencode .codex .copilot .gemini .config/amp .kiro Documents/Cline .devin; do
         check "payload in $file/unlazier-ai" test -f "$home/$file/unlazier-ai/reminder.md"
     done
-    check "Devin principles under 12,000 characters" shorter_than "$home/.devin/rules/unlazier-ai-principles.md" 12000
-    check "Devin topic rules under 12,000 characters" shorter_than "$home/.devin/rules/unlazier-ai-rules.md" 12000
     check "Claude prompt hook" json_has "$home/.claude/settings.json" \
         '[.hooks.UserPromptSubmit[].hooks[].command] | any(contains("inject.sh\" claude prompt"))'
     check "Claude compaction hook" json_has "$home/.claude/settings.json" \
@@ -152,7 +172,8 @@ test_reinstall_is_idempotent() {
     run_installer "$home" --harness "$ALL_HARNESSES" >/dev/null 2>&1
     run_installer "$home" --harness "$ALL_HARNESSES" >/dev/null 2>&1
 
-    check "one block in CLAUDE.md" has_one_block "$home/.claude/CLAUDE.md"
+    check "Claude rule files written once" has_all_rule_files "$home/.claude/rules"
+    check "one block in Codex AGENTS.md" has_one_block "$home/.codex/AGENTS.md"
     check "one Claude prompt hook" json_has "$home/.claude/settings.json" \
         '[.hooks.UserPromptSubmit[].hooks[] | select(.command | contains("unlazier-ai"))] | length == 1'
     check "one Codex prompt hook" json_has "$home/.codex/hooks.json" \
@@ -199,7 +220,8 @@ test_v1_leftovers_removed_with_yes() {
     check "v1 skill removed" file_absent "$home/.claude/skills/bugfix"
     check "user skill kept" test -f "$home/.claude/skills/my-skill/SKILL.md"
     check "v1 OpenCode config removed" file_absent "$home/.config/opencode/opencode.json"
-    check "v1 CLAUDE.md replaced by a block only" test "$(head -n 1 "$home/.claude/CLAUDE.md")" = "<!-- unlazier-ai:start -->"
+    check "v1 CLAUDE.md removed" file_absent "$home/.claude/CLAUDE.md"
+    check "v2 rule files installed" has_all_rule_files "$home/.claude/rules"
 }
 
 test_v1_leftovers_kept_without_confirmation() {
@@ -213,6 +235,29 @@ test_v1_leftovers_kept_without_confirmation() {
     check "v1 skill kept" test -d "$home/.claude/skills/bugfix"
 }
 
+# Version 2.0 wrote a block into CLAUDE.md and single or split files into the rules folders.
+seed_v2_0_installation() {
+    local home="$1"
+    mkdir -p "$home/.claude" "$home/.kiro/steering" "$home/.devin/rules"
+    printf '# My notes\n<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n' > "$home/.claude/CLAUDE.md"
+    printf '<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n' > "$home/.kiro/steering/unlazier-ai.md"
+    printf '<!-- unlazier-ai:start -->\nold rules\n<!-- unlazier-ai:end -->\n' > "$home/.devin/rules/unlazier-ai-rules.md"
+}
+
+test_upgrade_from_v2_0_layout() {
+    local home
+    echo "version 2.0 rules move to one file per rule"
+    home="$(new_home)"
+    seed_v2_0_installation "$home"
+    run_installer "$home" --harness claude,kiro,devin >/dev/null 2>&1
+
+    check "old block removed from CLAUDE.md" test "$(cat "$home/.claude/CLAUDE.md")" = "# My notes"
+    check "Claude rule files installed" has_all_rule_files "$home/.claude/rules"
+    check "old Kiro file removed" file_absent "$home/.kiro/steering/unlazier-ai.md"
+    check "old Devin split file removed" file_absent "$home/.devin/rules/unlazier-ai-rules.md"
+    check "Devin rule files installed" has_all_rule_files "$home/.devin/rules"
+}
+
 test_invalid_json_left_untouched() {
     local home before
     echo "an unreadable config file is never rewritten"
@@ -223,7 +268,7 @@ test_invalid_json_left_untouched() {
     run_installer "$home" --harness claude >/dev/null 2>&1
 
     check "settings.json unchanged" test "$before" = "$(cksum < "$home/.claude/settings.json")"
-    check "rules still installed" has_one_block "$home/.claude/CLAUDE.md"
+    check "rules still installed" has_all_rule_files "$home/.claude/rules"
 }
 
 # Builds a PATH with the tools the installer needs, minus jq.
@@ -243,7 +288,7 @@ test_missing_jq_installs_rules_only() {
     tools="$(path_without_jq)"
     output="$(PATH="$tools" run_installer "$home" --harness claude,kiro 2>&1)"
 
-    check "Claude rules installed" has_one_block "$home/.claude/CLAUDE.md"
+    check "Claude rules installed" has_all_rule_files "$home/.claude/rules"
     check "Claude hooks skipped" file_absent "$home/.claude/settings.json"
     check "jq install hint shown" test -n "$(printf '%s' "$output" | grep 'jq is not installed')"
 }
@@ -334,6 +379,7 @@ main() {
     test_uninstall_restores_original_files
     test_v1_leftovers_removed_with_yes
     test_v1_leftovers_kept_without_confirmation
+    test_upgrade_from_v2_0_layout
     test_invalid_json_left_untouched
     test_missing_jq_installs_rules_only
     test_inject_usage_lines

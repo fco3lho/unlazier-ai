@@ -130,6 +130,34 @@ function Test-ContainsLine {
     return @([System.IO.File]::ReadAllText($Path) -split "`n" | Where-Object { $_.TrimEnd("`r") -eq $Line }).Count -gt 0
 }
 
+# Principles plus one file per topic rule.
+$ExpectedRuleFiles = 11
+
+function Get-RuleFiles {
+    param([string]$Folder)
+    if (-not (Test-Path -LiteralPath $Folder -PathType Container)) {
+        return @()
+    }
+    return @(Get-ChildItem -LiteralPath $Folder -File -Filter 'unlazier-ai*.md')
+}
+
+function Test-HasAllRuleFiles {
+    param([string]$Folder)
+    return (Get-RuleFiles $Folder).Count -eq $ExpectedRuleFiles
+}
+
+# Every rule file stays below a character limit and a line limit.
+function Test-RuleFilesWithin {
+    param([string]$Folder, [int]$MaxCharacters, [int]$MaxLines)
+    foreach ($file in (Get-RuleFiles $Folder)) {
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        if ($text.Length -ge $MaxCharacters -or @($text -split "`n").Count -gt $MaxLines) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function Get-HookCommands {
     param($Document, [string]$EventName)
     return @($Document.hooks.$EventName | ForEach-Object { $_.hooks } | ForEach-Object { $_.command })
@@ -183,13 +211,18 @@ function Test-InstallPreservesUserContent {
     Initialize-UserConfiguration $testHome
     [void](Invoke-Installer $testHome @('-Harness', $AllHarnesses))
 
-    Assert-That 'Claude notes kept' { Test-ContainsLine (Join-TestPath $testHome '.claude/CLAUDE.md') 'Always use tabs.' }
+    Assert-That 'CLAUDE.md untouched' {
+        [System.IO.File]::ReadAllText((Join-TestPath $testHome '.claude/CLAUDE.md')) -eq "# My notes`nAlways use tabs.`n"
+    }
     Assert-That 'Codex notes kept' { Test-ContainsLine (Join-TestPath $testHome '.codex/AGENTS.md') '# Codex notes' }
     Assert-That 'existing Claude hook kept' {
         (Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.claude/settings.json')) 'Stop') -contains 'beep'
     }
     Assert-That 'existing Claude status line kept' {
         (Read-TestJson (Join-TestPath $testHome '.claude/settings.json')).statusLine.command -eq 'my-status'
+    }
+    Assert-That 'unused status line script not copied' {
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/unlazier-ai/claude-statusline.ps1'))
     }
     Assert-That 'existing Codex hook kept' {
         (Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.codex/hooks.json')) 'UserPromptSubmit') -contains 'my-codex-hook'
@@ -202,23 +235,21 @@ function Test-InstallAddsAllLayers {
     $testHome = New-TestHome
     [void](Invoke-Installer $testHome @('-Harness', $AllHarnesses))
 
-    foreach ($file in @('.claude/CLAUDE.md', '.config/opencode/AGENTS.md', '.codex/AGENTS.md',
-            '.copilot/copilot-instructions.md', '.gemini/GEMINI.md', '.config/amp/AGENTS.md',
-            '.kiro/steering/unlazier-ai.md', 'Documents/Cline/Rules/unlazier-ai.md',
-            '.devin/rules/unlazier-ai-principles.md', '.devin/rules/unlazier-ai-rules.md')) {
+    foreach ($file in @('.config/opencode/AGENTS.md', '.codex/AGENTS.md', '.copilot/copilot-instructions.md',
+            '.gemini/GEMINI.md', '.config/amp/AGENTS.md')) {
         $path = Join-TestPath $testHome $file
         Assert-That "rules block in $file" { (Get-BlockCount $path) -eq 1 }
     }
+    foreach ($folder in @('.claude/rules', '.kiro/steering', 'Documents/Cline/Rules', '.devin/rules')) {
+        $path = Join-TestPath $testHome $folder
+        Assert-That "rule files in $folder" { Test-HasAllRuleFiles $path }
+        Assert-That "rule files in $folder are short" { Test-RuleFilesWithin $path 12000 200 }
+    }
+    Assert-That 'no CLAUDE.md created' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/CLAUDE.md')) }
     foreach ($directory in @('.claude', '.config/opencode', '.codex', '.copilot', '.gemini', '.config/amp', '.kiro',
             'Documents/Cline', '.devin')) {
         $path = Join-TestPath $testHome "$directory/unlazier-ai/reminder.md"
         Assert-That "payload in $directory/unlazier-ai" { Test-Path -LiteralPath $path -PathType Leaf }
-    }
-    Assert-That 'Devin principles under 12,000 characters' {
-        [System.IO.File]::ReadAllText((Join-TestPath $testHome '.devin/rules/unlazier-ai-principles.md')).Length -lt 12000
-    }
-    Assert-That 'Devin topic rules under 12,000 characters' {
-        [System.IO.File]::ReadAllText((Join-TestPath $testHome '.devin/rules/unlazier-ai-rules.md')).Length -lt 12000
     }
     $claudeSettings = Read-TestJson (Join-TestPath $testHome '.claude/settings.json')
     Assert-That 'Claude prompt hook' {
@@ -259,7 +290,8 @@ function Test-ReinstallIsIdempotent {
     [void](Invoke-Installer $testHome @('-Harness', $AllHarnesses))
     [void](Invoke-Installer $testHome @('-Harness', $AllHarnesses))
 
-    Assert-That 'one block in CLAUDE.md' { (Get-BlockCount (Join-TestPath $testHome '.claude/CLAUDE.md')) -eq 1 }
+    Assert-That 'Claude rule files written once' { Test-HasAllRuleFiles (Join-TestPath $testHome '.claude/rules') }
+    Assert-That 'one block in Codex AGENTS.md' { (Get-BlockCount (Join-TestPath $testHome '.codex/AGENTS.md')) -eq 1 }
     Assert-That 'one Claude prompt hook' {
         @(Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.claude/settings.json')) 'UserPromptSubmit' |
             Where-Object { $_.Contains('unlazier-ai') }).Count -eq 1
@@ -319,9 +351,8 @@ function Test-V1LeftoversRemovedWithYes {
     Assert-That 'v1 skill removed' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/skills/bugfix')) }
     Assert-That 'user skill kept' { Test-Path -LiteralPath (Join-TestPath $testHome '.claude/skills/my-skill/SKILL.md') -PathType Leaf }
     Assert-That 'v1 OpenCode config removed' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.config/opencode/opencode.json')) }
-    Assert-That 'v1 CLAUDE.md replaced by a block only' {
-        ([System.IO.File]::ReadAllText((Join-TestPath $testHome '.claude/CLAUDE.md')) -split "`n")[0] -eq '<!-- unlazier-ai:start -->'
-    }
+    Assert-That 'v1 CLAUDE.md removed' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.claude/CLAUDE.md')) }
+    Assert-That 'v2 rule files installed' { Test-HasAllRuleFiles (Join-TestPath $testHome '.claude/rules') }
 }
 
 function Test-V1LeftoversKeptWithoutConfirmation {
@@ -334,6 +365,32 @@ function Test-V1LeftoversKeptWithoutConfirmation {
     Assert-That 'v1 skill kept' { Test-Path -LiteralPath (Join-TestPath $testHome '.claude/skills/bugfix') -PathType Container }
 }
 
+# Version 2.0 wrote a block into CLAUDE.md and single or split files into the rules folders.
+function Initialize-V20Installation {
+    param([string]$TestHome)
+    $oldBlock = "<!-- unlazier-ai:start -->`nold rules`n<!-- unlazier-ai:end -->`n"
+    Write-TestFile (Join-TestPath $TestHome '.claude/CLAUDE.md') ("# My notes`n" + $oldBlock)
+    Write-TestFile (Join-TestPath $TestHome '.kiro/steering/unlazier-ai.md') $oldBlock
+    Write-TestFile (Join-TestPath $TestHome '.devin/rules/unlazier-ai-rules.md') $oldBlock
+}
+
+function Test-UpgradeFromV20Layout {
+    Write-Host 'version 2.0 rules move to one file per rule'
+    $testHome = New-TestHome
+    Initialize-V20Installation $testHome
+    [void](Invoke-Installer $testHome @('-Harness', 'claude,kiro,devin'))
+
+    Assert-That 'old block removed from CLAUDE.md' {
+        [System.IO.File]::ReadAllText((Join-TestPath $testHome '.claude/CLAUDE.md')) -eq "# My notes`n"
+    }
+    Assert-That 'Claude rule files installed' { Test-HasAllRuleFiles (Join-TestPath $testHome '.claude/rules') }
+    Assert-That 'old Kiro file removed' { -not (Test-Path -LiteralPath (Join-TestPath $testHome '.kiro/steering/unlazier-ai.md')) }
+    Assert-That 'old Devin split file removed' {
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.devin/rules/unlazier-ai-rules.md'))
+    }
+    Assert-That 'Devin rule files installed' { Test-HasAllRuleFiles (Join-TestPath $testHome '.devin/rules') }
+}
+
 function Test-InvalidJsonLeftUntouched {
     Write-Host 'an unreadable config file is never rewritten'
     $testHome = New-TestHome
@@ -343,7 +400,7 @@ function Test-InvalidJsonLeftUntouched {
     [void](Invoke-Installer $testHome @('-Harness', 'claude'))
 
     Assert-That 'settings.json unchanged' { (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash -eq $before }
-    Assert-That 'rules still installed' { (Get-BlockCount (Join-TestPath $testHome '.claude/CLAUDE.md')) -eq 1 }
+    Assert-That 'rules still installed' { Test-HasAllRuleFiles (Join-TestPath $testHome '.claude/rules') }
 }
 
 function Get-UnixNow {
@@ -464,6 +521,7 @@ try {
     Test-UninstallRestoresOriginalFiles
     Test-V1LeftoversRemovedWithYes
     Test-V1LeftoversKeptWithoutConfirmation
+    Test-UpgradeFromV20Layout
     Test-InvalidJsonLeftUntouched
     Test-InjectUsageLines
     Test-InjectOutputFormats
