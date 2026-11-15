@@ -154,7 +154,7 @@ When it parallelizes, it prefers, in this order: helper agents for parts of the 
 
 **Where the numbers come from:**
 
-- **Claude Code** sends usage only to the status line (the bar at the bottom of the screen). If you have no status line, the installer adds one that shows both windows and saves them for the reminder:
+- **Claude Code** sends usage only to the status line (the bar at the bottom of the screen). If you have no status line, the installer adds one that shows both windows and saves them for the reminder. It refreshes every minute, not only when you send a message:
 
     ```
     Session 5h: [██░░░░░░░░] 24% · resets in 2h 2m

@@ -156,7 +156,7 @@ Quando paraleliza, ele prefere, nesta ordem: agentes auxiliares para partes da m
 
 **De onde vêm os números:**
 
-- **Claude Code** envia o uso só para a status line (a barra na parte de baixo da tela). Se você não tem status line, o instalador adiciona uma que mostra as duas janelas e as salva para o lembrete:
+- **Claude Code** envia o uso só para a status line (a barra na parte de baixo da tela). Se você não tem status line, o instalador adiciona uma que mostra as duas janelas e as salva para o lembrete. Ela se atualiza a cada minuto, não só quando você envia uma mensagem:
 
     ```
     Session 5h: [██░░░░░░░░] 24% · resets in 2h 2m

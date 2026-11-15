@@ -267,6 +267,7 @@ function Test-InstallAddsAllLayers {
     }
     Assert-That 'Claude compaction hook' { @($claudeSettings.hooks.SessionStart | Where-Object { $_.matcher -eq 'compact' }).Count -eq 1 }
     Assert-That 'Claude status line installed' { $claudeSettings.statusLine.command.Contains('claude-statusline.ps1') }
+    Assert-That 'Claude status line refreshes every minute' { $claudeSettings.statusLine.refreshInterval -eq 60 }
     Assert-That 'Codex hooks registered' {
         @(Get-HookCommands (Read-TestJson (Join-TestPath $testHome '.codex/hooks.json')) 'UserPromptSubmit' |
             Where-Object { $_.Contains('inject.ps1" codex prompt') }).Count -eq 1

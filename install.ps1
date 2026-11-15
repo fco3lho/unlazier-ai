@@ -633,7 +633,8 @@ param(
     }
 
     # Claude Code passes usage windows only to the status line, so the status line is the usage
-    # source. An existing status line is never replaced.
+    # source. An existing status line is never replaced. The 60-second refresh keeps the saved
+    # usage fresh while no message is sent; a reading older than 15 minutes counts as unknown.
     function Install-StatusLine {
         $claudeHome = Get-HarnessHome 'claude'
         $settingsPath = [System.IO.Path]::Combine($claudeHome, 'settings.json')
@@ -651,7 +652,8 @@ param(
         $scriptPath = [System.IO.Path]::Combine($claudeHome, $PayloadDirectoryName, 'claude-statusline.ps1')
         Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'statusline', 'claude-statusline.ps1')) `
             -Destination $scriptPath -Force
-        Set-JsonProperty $document 'statusLine' ([pscustomobject]@{ type = 'command'; command = (Get-ScriptCommand $scriptPath '') })
+        Set-JsonProperty $document 'statusLine' ([pscustomobject]@{
+            type = 'command'; command = (Get-ScriptCommand $scriptPath ''); refreshInterval = 60 })
         Write-JsonConfig $settingsPath $document
         return $true
     }
