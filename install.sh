@@ -377,7 +377,8 @@ install_plugin() {
 }
 
 # Claude Code passes usage windows only to the status line, so the status line is the usage
-# source. An existing status line is never replaced.
+# source. An existing status line is never replaced. The 60-second refresh keeps the saved
+# usage fresh while no message is sent; a reading older than 15 minutes counts as unknown.
 install_statusline() {
     local home settings
     home="$(harness_home claude)"
@@ -389,7 +390,7 @@ install_statusline() {
     fi
     cp "$SOURCE_DIR/statusline/claude-statusline.sh" "$home/$PAYLOAD_DIR_NAME/"
     chmod +x "$home/$PAYLOAD_DIR_NAME/claude-statusline.sh"
-    update_json_file "$settings" '.statusLine = {type: "command", command: $command}' \
+    update_json_file "$settings" '.statusLine = {type: "command", command: $command, refreshInterval: 60}' \
         --arg command "bash \"$home/$PAYLOAD_DIR_NAME/claude-statusline.sh\""
 }
 

@@ -158,6 +158,8 @@ test_install_adds_all_layers() {
         '.hooks.SessionStart | any(.matcher == "compact")'
     check "Claude status line installed" json_has "$home/.claude/settings.json" \
         '.statusLine.command | contains("claude-statusline.sh")'
+    check "Claude status line refreshes every minute" json_has "$home/.claude/settings.json" \
+        '.statusLine.refreshInterval == 60'
     check "Codex hooks registered" json_has "$home/.codex/hooks.json" \
         '[.hooks.UserPromptSubmit[].hooks[].command] | any(contains("inject.sh\" codex prompt"))'
     check "Gemini hook registered" json_has "$home/.gemini/settings.json" \

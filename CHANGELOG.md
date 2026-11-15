@@ -2,6 +2,12 @@
 
 All notable changes to Unlazier (called Unlazier AI before version 2.1) are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- The Claude Code status line installed by Unlazier refreshes every minute (`refreshInterval: 60`), not only when a message is sent, so the usage saved for the reminder stays current while you are idle.
+
 ## [2.1.0] - 2026-11-14
 
 ### Added

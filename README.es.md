@@ -156,7 +156,7 @@ Cuando trabaja en paralelo, prefiere, en este orden: agentes auxiliares para par
 
 **De dónde salen los números:**
 
-- **Claude Code** envía el uso solo a la barra de estado (la línea de la parte inferior de la pantalla). Si no tienes una barra de estado, el instalador agrega una que muestra las dos ventanas y las guarda para el recordatorio:
+- **Claude Code** envía el uso solo a la barra de estado (la línea de la parte inferior de la pantalla). Si no tienes una barra de estado, el instalador agrega una que muestra las dos ventanas y las guarda para el recordatorio. Se actualiza cada minuto, no solo cuando envías un mensaje:
 
     ```
     Session 5h: [██░░░░░░░░] 24% · resets in 2h 2m
