@@ -40,7 +40,7 @@ param(
     $AllHarnesses = @('claude', 'opencode', 'codex', 'copilot', 'gemini', 'amp', 'kiro', 'cline', 'devin')
     $RuleNames = @('structure', 'correctness', 'style', 'completeness', 'performance', 'testability', 'async',
         'naming', 'documentation', 'parallelism')
-    $PayloadFiles = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1', 'hooks/alert.ps1',
+    $PayloadFiles = @('AGENTS.md', 'reminder.md', 'hooks/inject.ps1', 'hooks/alert.ps1', 'hooks/wait-usage.ps1',
         'statusline/claude-statusline.ps1', 'plugins/opencode.ts', 'plugins/amp.ts')
     $MarkerStart = '<!-- unlazier:start -->'
     $MarkerEnd = '<!-- unlazier:end -->'
@@ -833,6 +833,11 @@ param(
         foreach ($relativePath in $files) {
             $source = [System.IO.Path]::Combine($State.SourceDirectory, $relativePath)
             Copy-Item -LiteralPath $source -Destination ([System.IO.Path]::Combine($target, (Split-Path -Leaf $relativePath))) -Force
+        }
+        # Only Claude Code saves its usage to a file that a background task can poll.
+        if ($Name -eq 'claude') {
+            Copy-Item -LiteralPath ([System.IO.Path]::Combine($State.SourceDirectory, 'hooks', 'wait-usage.ps1')) `
+                -Destination ([System.IO.Path]::Combine($target, 'wait-usage.ps1')) -Force
         }
     }
 

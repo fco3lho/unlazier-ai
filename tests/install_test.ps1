@@ -531,6 +531,82 @@ function Test-InjectUsageLines {
     }
 }
 
+# Writes a usage snapshot with one window; a null ResetsAt leaves the field out.
+function Write-RateLimits {
+    param([string]$TestHome, [string]$Window, $Used, $ResetsAt = $null)
+    $entry = [ordered]@{ used_percentage = $Used }
+    if ($null -ne $ResetsAt) {
+        $entry['resets_at'] = $ResetsAt
+    }
+    Write-TestJson (Join-TestPath $TestHome '.claude/state/rate_limits.json') ([pscustomobject]@{ $Window = [pscustomobject]$entry })
+}
+
+function Invoke-WaitUsage {
+    param([string]$TestHome, [string[]]$Arguments)
+    return Invoke-TestScript $TestHome (Join-TestPath $TestHome '.claude/unlazier/wait-usage.ps1') $Arguments
+}
+
+function Test-WaitUsageExits {
+    Write-Host 'wait-usage ends with one line per reason'
+    $testHome = New-TestHome
+    $now = Get-UnixNow
+    [void](Invoke-Installer $testHome @('-Harness', 'claude,codex'))
+    $scriptPath = Join-TestPath $testHome '.claude/unlazier/wait-usage.ps1'
+    $stateFile = Join-TestPath $testHome '.claude/state/rate_limits.json'
+    $guard = @('-Interval', '1', '-MaxWait', '10')
+
+    Assert-That 'script installed for Claude Code' { Test-Path -LiteralPath $scriptPath -PathType Leaf }
+    Assert-That 'script not installed for Codex' {
+        -not (Test-Path -LiteralPath (Join-TestPath $testHome '.codex/unlazier/wait-usage.ps1'))
+    }
+    Assert-That 'missing state file fails fast' { (Invoke-WaitUsage $testHome $guard).ExitCode -eq 1 }
+
+    Write-RateLimits $testHome 'seven_day' 30
+    Assert-That 'missing window fails fast' { (Invoke-WaitUsage $testHome $guard).ExitCode -eq 1 }
+    Assert-That 'unknown option is a usage error' { (Invoke-WaitUsage $testHome @('-Unknown')).ExitCode -eq 2 }
+    Assert-That 'invalid number is a usage error' { (Invoke-WaitUsage $testHome @('-StopAt', 'ninety')).ExitCode -eq 2 }
+
+    Write-RateLimits $testHome 'five_hour' 24 ($now - 120)
+    Assert-That 'passed reset time ends the wait' {
+        (Get-LastLine (Invoke-WaitUsage $testHome ($guard + @('-Grace', '60')))) -eq 'reset used=24 start=24'
+    }
+
+    Write-RateLimits $testHome 'five_hour' 96
+    Assert-That 'usage at the stop level ends the wait' {
+        (Get-LastLine (Invoke-WaitUsage $testHome ($guard + @('-StopAt', '95')))) -eq 'threshold used=96 stop_at=95'
+    }
+
+    Write-RateLimits $testHome 'seven_day' 99
+    Assert-That 'weekly window can be watched' {
+        (Get-LastLine (Invoke-WaitUsage $testHome ($guard + @('-Window', 'seven_day', '-StopAt', '99')))) -eq 'threshold used=99 stop_at=99'
+    }
+
+    Write-RateLimits $testHome 'five_hour' 50
+    Assert-That 'no reset time ends only by timeout' {
+        (Get-LastLine (Invoke-WaitUsage $testHome @('-Interval', '1', '-MaxWait', '2'))) -eq 'timeout used=50'
+    }
+
+    $otherFile = Join-TestPath $testHome 'other.json'
+    Copy-Item -LiteralPath $stateFile -Destination $otherFile
+    Remove-Item -LiteralPath $stateFile
+    Assert-That 'state option replaces the default file' {
+        (Get-LastLine (Invoke-WaitUsage $testHome @('-Interval', '1', '-MaxWait', '2', '-State', $otherFile))) -eq 'timeout used=50'
+    }
+
+    Write-RateLimits $testHome 'five_hour' 50 ($now + 3600)
+    $waiterOutput = Join-TestPath $testHome 'waiter.out'
+    $waiter = Start-Process -FilePath $PowerShellPath -PassThru -NoNewWindow -RedirectStandardOutput $waiterOutput `
+        -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$scriptPath`"") + $guard)
+    Start-Sleep -Seconds 2
+    Write-TestFile $stateFile '{"five_hour": {"used_perc'
+    Start-Sleep -Seconds 2
+    Write-RateLimits $testHome 'five_hour' 10 ($now + 3600)
+    [void]$waiter.WaitForExit(20000)
+    Assert-That 'usage drop ends the wait after a torn snapshot' {
+        [System.IO.File]::ReadAllText($waiterOutput).Trim() -eq 'dropped used=10 start=50'
+    }
+}
+
 function ConvertFrom-OutputJson {
     param($Result)
     return (($Result.Lines -join "`n") | ConvertFrom-Json)
@@ -595,6 +671,7 @@ try {
     Test-InjectUsageLines
     Test-InjectOutputFormats
     Test-StatusLineSavesUsage
+    Test-WaitUsageExits
 } finally {
     foreach ($name in $IsolatedVariables) {
         [Environment]::SetEnvironmentVariable($name, $originalEnvironment[$name])

@@ -23,7 +23,7 @@ RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
 ALL_HARNESSES="claude opencode codex copilot gemini amp kiro cline devin"
 RULE_NAMES="structure correctness style completeness performance testability async naming documentation parallelism"
-PAYLOAD_FILES="AGENTS.md reminder.md hooks/inject.sh hooks/alert.sh statusline/claude-statusline.sh plugins/opencode.ts plugins/amp.ts"
+PAYLOAD_FILES="AGENTS.md reminder.md hooks/inject.sh hooks/alert.sh hooks/wait-usage.sh statusline/claude-statusline.sh plugins/opencode.ts plugins/amp.ts"
 MARKER_START="<!-- unlazier:start -->"
 MARKER_END="<!-- unlazier:end -->"
 PAYLOAD_DIR_NAME="unlazier"
@@ -534,6 +534,11 @@ install_payload() {
     mkdir -p "$target"
     cp "$SOURCE_DIR/AGENTS.md" "$SOURCE_DIR/reminder.md" "$SOURCE_DIR/hooks/inject.sh" "$SOURCE_DIR/hooks/alert.sh" "$target/"
     chmod +x "$target/inject.sh" "$target/alert.sh"
+    # Only Claude Code saves its usage to a file that a background task can poll.
+    if [ "$harness" = "claude" ]; then
+        cp "$SOURCE_DIR/hooks/wait-usage.sh" "$target/"
+        chmod +x "$target/wait-usage.sh"
+    fi
 }
 
 remove_payload() {

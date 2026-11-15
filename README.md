@@ -146,9 +146,11 @@ Subscriptions such as Claude and ChatGPT limit how much you can use in a 5-hour 
 | below 70% | Runs as much work in parallel as it can |
 | 70% to 85% | Runs at most 2 tasks at a time |
 | 85% to 95% | Works on one task at a time, without helper agents |
-| 95% or more | Finishes the current step, tells you, and waits |
+| 95% or more | Stops the running helper agents, waits in the background for the window to reset, and resumes on its own |
 
 When the **weekly** window reaches 99%, the assistant finishes the current step, tells you, and waits.
+
+In **Claude Code**, the wait at 95% is a script that Unlazier installs (`~/.claude/unlazier/wait-usage.sh`, or `wait-usage.ps1` on Windows). It reads the saved usage and ends when the window resets, which wakes the assistant. Other tools cannot be woken by a background task, so they finish the current step, tell you, and wait.
 
 When it parallelizes, it prefers, in this order: helper agents for parts of the same task, then different tasks of the same request, then different requests.
 
@@ -295,6 +297,7 @@ Repository layout:
 | `reminder.md` | The short reminder (layer 2). |
 | `hooks/inject.sh`, `hooks/inject.ps1` | Prints the reminder and the usage line (layers 2 and 3) in the format each tool expects. |
 | `hooks/alert.sh`, `hooks/alert.ps1` | Plays the alert beeps (layer 4). |
+| `hooks/wait-usage.sh`, `hooks/wait-usage.ps1` | Waits in the background for a usage window to reset or reach a limit; installed for Claude Code only. |
 | `statusline/` | Claude Code status line that saves usage for the reminder. |
 | `plugins/` | OpenCode and Amp plugins, which call the same hook script. |
 | `install.sh`, `install.ps1` | Installers; each tool is an adapter in one table. `uninstall.*` call them in uninstall mode. |

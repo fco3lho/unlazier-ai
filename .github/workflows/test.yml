@@ -35,4 +35,4 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Run shellcheck
-              run: shellcheck install.sh uninstall.sh hooks/inject.sh statusline/claude-statusline.sh tests/install_test.sh
+              run: shellcheck install.sh uninstall.sh hooks/inject.sh hooks/wait-usage.sh statusline/claude-statusline.sh tests/install_test.sh
