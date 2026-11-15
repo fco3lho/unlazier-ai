@@ -399,6 +399,65 @@ test_inject_usage_lines() {
         = "Usage: unknown (no usage reading from the last 15 minutes)"
 }
 
+# Writes a usage snapshot with one window; an empty resets_at leaves the field out.
+write_rate_limits() {
+    local home="$1" window="$2" used="$3" resets_at="${4:-null}"
+    mkdir -p "$home/.claude/state"
+    jq -n --arg window "$window" --argjson used "$used" --argjson resets_at "$resets_at" '
+        {($window): ({used_percentage: $used} + (if $resets_at == null then {} else {resets_at: $resets_at} end))}' \
+        > "$home/.claude/state/rate_limits.json"
+}
+
+exit_status() { "$@" >/dev/null 2>&1; echo $?; }
+
+test_wait_usage_exits() {
+    local home now script waiter
+    echo "wait-usage ends with one line per reason"
+    home="$(new_home)"
+    now="$(date +%s)"
+    run_installer "$home" --harness claude,codex >/dev/null 2>&1
+    script="$home/.claude/unlazier/wait-usage.sh"
+
+    check "script installed and executable for Claude Code" test -x "$script"
+    check "script not installed for Codex" file_absent "$home/.codex/unlazier/wait-usage.sh"
+    check "missing state file fails fast" test "$(exit_status bash "$script" --interval 1 --max-wait 10)" = "1"
+
+    write_rate_limits "$home" seven_day 30
+    check "missing window fails fast" test "$(exit_status bash "$script" --interval 1 --max-wait 10)" = "1"
+    check "unknown option is a usage error" test "$(exit_status bash "$script" --unknown)" = "2"
+    check "invalid number is a usage error" test "$(exit_status bash "$script" --stop-at ninety)" = "2"
+
+    write_rate_limits "$home" five_hour 24 "$((now - 120))"
+    check "passed reset time ends the wait" test "$(bash "$script" --interval 1 --max-wait 10 --grace 60)" \
+        = "reset used=24 start=24"
+
+    write_rate_limits "$home" five_hour 96
+    check "usage at the stop level ends the wait" test "$(bash "$script" --interval 1 --max-wait 10 --stop-at 95)" \
+        = "threshold used=96 stop_at=95"
+
+    write_rate_limits "$home" seven_day 99
+    check "weekly window can be watched" test \
+        "$(bash "$script" --interval 1 --max-wait 10 --window seven_day --stop-at 99)" = "threshold used=99 stop_at=99"
+
+    write_rate_limits "$home" five_hour 50
+    check "no reset time ends only by timeout" test "$(bash "$script" --interval 1 --max-wait 2)" = "timeout used=50"
+
+    cp "$home/.claude/state/rate_limits.json" "$home/other.json"
+    rm "$home/.claude/state/rate_limits.json"
+    check "state option replaces the default file" test \
+        "$(bash "$script" --interval 1 --max-wait 2 --state "$home/other.json")" = "timeout used=50"
+
+    write_rate_limits "$home" five_hour 50 "$((now + 3600))"
+    bash "$script" --interval 1 --max-wait 10 > "$home/waiter.out" 2>&1 &
+    waiter=$!
+    sleep 2
+    printf '{"five_hour": {"used_perc' > "$home/.claude/state/rate_limits.json"
+    sleep 2
+    write_rate_limits "$home" five_hour 10 "$((now + 3600))"
+    wait "$waiter"
+    check "usage drop ends the wait after a torn snapshot" test "$(cat "$home/waiter.out")" = "dropped used=10 start=50"
+}
+
 test_inject_output_formats() {
     local home
     echo "inject prints the shape each harness expects"
@@ -451,6 +510,7 @@ main() {
     test_inject_usage_lines
     test_inject_output_formats
     test_statusline_saves_usage
+    test_wait_usage_exits
     test_cline_question_alert_filters_tools
     echo
     echo "$PASSED passed, $FAILED failed"
