@@ -443,6 +443,12 @@ test_inject_project_rules() {
     wide="$(cd "$wide" && pwd -P)"
     for number in 1 2 3 4 5 6 7 8 9 10 11 12 13; do printf '## S%s\n' "$number"; done > "$wide/AGENTS.md"
     printf '## Gemini\n' > "$wide/GEMINI.md"
+
+    chmod 000 "$plain/.claude/CLAUDE.md"
+    check "an unreadable file keeps the reminder and drops the sections" \
+        test "$(inject_from "$home" .claude claude prompt "$plain" 2>&1 | sed -n '1p;/Project rules/p' | tr '\n' '|')" \
+        = "Unlazier rules are active for this session.|- Project rules: $plain/.claude/CLAUDE.md apply; re-read the relevant section before acting on it.|"
+    chmod 644 "$plain/.claude/CLAUDE.md"
     check "Codex lists at most 12 sections of AGENTS.md" \
         test "$(project_rules_of "$home" .codex codex prompt "$wide")" \
         = "- Project rules: $wide/AGENTS.md apply (S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, ...); re-read the relevant section before acting on it."

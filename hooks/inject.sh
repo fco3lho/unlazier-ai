@@ -130,7 +130,9 @@ project_rules_file() {
 project_rules_line() {
     local file titles
     file="$(project_rules_file "$1")" || return 0
-    titles="$(awk -v max="$MAX_SECTION_TITLES" "$SECTION_TITLES_PROGRAM" "$file")"
+    # A file that cannot be read still gets its line, without sections: the reminder must not
+    # break, and the path lets the agent open the file and see the error itself.
+    titles="$(awk -v max="$MAX_SECTION_TITLES" "$SECTION_TITLES_PROGRAM" "$file" 2>/dev/null)" || titles=""
     if [ -n "$titles" ]; then
         echo "- Project rules: $file apply ($titles); re-read the relevant section before acting on it."
     else
