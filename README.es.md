@@ -37,7 +37,7 @@ Unlazier agrega cuatro capas a cada herramienta. Todas las herramientas reciben 
 | Capa | Qué hace | Por qué importa |
 |------|----------|-----------------|
 | **1. Reglas** | Agrega las reglas a la carpeta de reglas de la herramienta, un archivo pequeño por regla, o a su archivo de instrucciones globales cuando la herramienta no tiene carpeta de reglas. El asistente las lee al inicio de cada sesión. | El asistente sabe qué se espera de él desde el primer mensaje. |
-| **2. Recordatorio** | Vuelve a enviar un resumen corto de las reglas con cada uno de tus mensajes, y los principios básicos después de que la conversación se compacta. | En sesiones largas, las instrucciones del inicio pierden peso a medida que la conversación crece. El recordatorio las mantiene presentes. |
+| **2. Recordatorio** | Vuelve a enviar un resumen corto de las reglas con cada uno de tus mensajes, y los principios básicos después de que la conversación se compacta. Cuando el proyecto tiene su propio archivo de reglas (`CLAUDE.md`, `AGENTS.md` o `GEMINI.md`), también nombra ese archivo y sus secciones. | En sesiones largas, las instrucciones del inicio pierden peso a medida que la conversación crece. El recordatorio las mantiene presentes. |
 | **3. Uso** | Agrega al recordatorio una línea que indica cuánto llevas usado de tus límites de 5 horas y semanal. | El asistente puede hacer tareas en paralelo cuando hay margen y bajar el ritmo antes de que llegues a un límite. |
 | **4. Alertas** | Hace sonar tres pitidos cortos cuando el asistente pide tu permiso, te hace una pregunta o termina su turno. | Puedes hacer otra cosa mientras trabaja y volver cuando te necesite. |
 

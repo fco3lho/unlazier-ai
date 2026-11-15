@@ -17,6 +17,7 @@ Set-StrictMode -Version 2.0
 $ScriptDirectory = $PSScriptRoot
 $HarnessHome = Split-Path -Parent $ScriptDirectory
 $MaxReadingAgeSeconds = 900
+$MaxSectionTitles = 12
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 # Opens the file with FileShare.ReadWrite because Codex keeps its session log open for
@@ -236,13 +237,94 @@ function Get-UsageLine {
     return "Usage: 5h $(Format-Percent $reading.FiveHour) | weekly $(Format-Percent $reading.Weekly) (source: $source, $ageMinutes min old)"
 }
 
+# The harness runs the hook from the project, so the repository root comes from the working
+# directory, or the directory itself outside a repository or without git.
+function Get-ProjectRoot {
+    $location = (Get-Location).ProviderPath
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        return $location
+    }
+    # Windows PowerShell 5.1 turns native stderr into terminating errors under 'Stop'.
+    $ErrorActionPreference = 'Continue'
+    $root = & git rev-parse --show-toplevel 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $root) {
+        return $location
+    }
+    return [System.IO.Path]::GetFullPath(@($root)[0])
+}
+
+# The project's own instruction file for the harness, or $null for harnesses without one.
+function Find-ProjectRulesFile {
+    param([string]$Harness)
+    switch ($Harness) {
+        'claude' { $names = @('CLAUDE.md', '.claude/CLAUDE.md') }
+        { $_ -in @('codex', 'opencode', 'amp') } { $names = @('AGENTS.md') }
+        'gemini' { $names = @('GEMINI.md') }
+        default { return $null }
+    }
+    $root = Get-ProjectRoot
+    foreach ($name in $names) {
+        $path = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($root, $name))
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            return $path
+        }
+    }
+    return $null
+}
+
+# The "## " titles of a Markdown file, comma-separated, skipping fenced code blocks.
+function Get-SectionTitles {
+    param([string]$Path)
+    $titles = New-Object System.Collections.Generic.List[string]
+    $count = 0
+    $isFenced = $false
+    foreach ($line in ((Read-SharedText $Path) -split "`n")) {
+        if ($line -match '^(```|~~~)') {
+            $isFenced = -not $isFenced
+            continue
+        }
+        if (-not $isFenced -and $line -match '^## +(.*)$') {
+            $count++
+            if ($count -le $MaxSectionTitles) {
+                $titles.Add($Matches[1].TrimEnd(' ', "`t", "`r"))
+            }
+        }
+    }
+    $text = $titles -join ', '
+    if ($count -gt $MaxSectionTitles) {
+        $text += ', ...'
+    }
+    return $text
+}
+
+# The project's rules lose weight between compactions like the global ones, but repeating the
+# whole file on every prompt would fill the context, so the reminder names it and its sections.
+function Get-ProjectRulesLine {
+    param([string]$Harness)
+    $path = Find-ProjectRulesFile $Harness
+    if ($null -eq $path) {
+        return ''
+    }
+    # A file that cannot be read still gets its line, without sections: the reminder must not
+    # break, and the path lets the agent open the file and see the error itself.
+    try {
+        $titles = Get-SectionTitles $path
+    } catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+        $titles = ''
+    }
+    if ($titles) {
+        return "- Project rules: $path apply ($titles); re-read the relevant section before acting on it.`n"
+    }
+    return "- Project rules: $path apply; re-read the relevant section before acting on it.`n"
+}
+
 # Mirrors the shell version: the pieces are printed in order and command substitution
 # strips the trailing newlines before the final one is added.
 function Get-Context {
     param([string]$Harness, [string]$EventName)
     switch ($EventName) {
         'prompt' {
-            $text = (Read-PayloadText 'reminder.md') + (Get-UsageLine $Harness) + "`n"
+            $text = (Read-PayloadText 'reminder.md') + (Get-ProjectRulesLine $Harness) + (Get-UsageLine $Harness) + "`n"
         }
         'compact' {
             $text = (Read-PayloadText 'AGENTS.md') + "`n" + (Read-PayloadText 'reminder.md') + (Get-UsageLine $Harness) + "`n"

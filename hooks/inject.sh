@@ -15,6 +15,21 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HARNESS_HOME="$(dirname "$SCRIPT_DIR")"
 MAX_READING_AGE_SECONDS=900
+MAX_SECTION_TITLES=12
+
+# The "## " titles of a Markdown file, comma-separated, skipping fenced code blocks.
+# shellcheck disable=SC2016  # awk program, not a shell expansion
+SECTION_TITLES_PROGRAM='
+/^(```|~~~)/ { fenced = !fenced; next }
+!fenced && /^## / {
+    title = $0
+    sub(/^## +/, "", title)
+    sub(/[ \t\r]+$/, "", title)
+    count++
+    if (count <= max) titles = titles (count > 1 ? ", " : "") title
+}
+END { if (count > max) titles = titles ", ..."; print titles }
+'
 
 # Normalized usage reading: {"five_hour": <percent|null>, "weekly": <percent|null>, "captured_at": <epoch>}.
 # A window counts only while its reset time is still in the future.
@@ -89,11 +104,48 @@ usage_line() {
         "$FORMAT_USAGE_PROGRAM"
 }
 
+# Prints the project's own instruction file for the harness; fails for harnesses without one.
+# The harness runs the hook from the project, so the repository root comes from the working
+# directory, or the directory itself outside a repository.
+project_rules_file() {
+    local harness="$1" root name names
+    case "$harness" in
+        claude) names="CLAUDE.md .claude/CLAUDE.md" ;;
+        codex|opencode|amp) names="AGENTS.md" ;;
+        gemini) names="GEMINI.md" ;;
+        *) return 1 ;;
+    esac
+    root="$(git rev-parse --show-toplevel 2>/dev/null)" || root="$(pwd -P)"
+    for name in $names; do
+        if [ -f "$root/$name" ]; then
+            echo "$root/$name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# The project's rules lose weight between compactions like the global ones, but repeating the
+# whole file on every prompt would fill the context, so the reminder names it and its sections.
+project_rules_line() {
+    local file titles
+    file="$(project_rules_file "$1")" || return 0
+    # A file that cannot be read still gets its line, without sections: the reminder must not
+    # break, and the path lets the agent open the file and see the error itself.
+    titles="$(awk -v max="$MAX_SECTION_TITLES" "$SECTION_TITLES_PROGRAM" "$file" 2>/dev/null)" || titles=""
+    if [ -n "$titles" ]; then
+        echo "- Project rules: $file apply ($titles); re-read the relevant section before acting on it."
+    else
+        echo "- Project rules: $file apply; re-read the relevant section before acting on it."
+    fi
+}
+
 build_context() {
     local harness="$1" event="$2"
     case "$event" in
         prompt)
             cat "$SCRIPT_DIR/reminder.md"
+            project_rules_line "$harness"
             ;;
         compact)
             cat "$SCRIPT_DIR/AGENTS.md"

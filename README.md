@@ -35,7 +35,7 @@ Unlazier adds four layers to each tool. Every tool gets the same four layers; on
 | Layer | What it does | Why it matters |
 |-------|--------------|----------------|
 | **1. Rules** | Adds the rules to the tool's rules folder, one small file per rule, or to its global instructions file when the tool has no rules folder. The assistant reads them at the start of every session. | The assistant knows what is expected from the first message. |
-| **2. Reminder** | Sends a short summary of the rules again with each of your messages, and the core principles again after the conversation is compacted. | In long sessions, instructions from the start lose weight as the conversation grows. The reminder keeps them fresh. |
+| **2. Reminder** | Sends a short summary of the rules again with each of your messages, and the core principles again after the conversation is compacted. When the project has its own rules file (`CLAUDE.md`, `AGENTS.md` or `GEMINI.md`), it also names that file and its sections. | In long sessions, instructions from the start lose weight as the conversation grows. The reminder keeps them fresh. |
 | **3. Usage** | Adds a line to the reminder saying how much of your 5-hour and weekly usage limits is used. | The assistant can run tasks in parallel when there is room, and slow down before you hit a limit. |
 | **4. Alerts** | Plays three short beeps when the assistant asks for your permission, asks you a question, or finishes its turn. | You can look away while it works and come back when it needs you. |
 

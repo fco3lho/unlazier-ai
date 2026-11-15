@@ -635,6 +635,99 @@ function Test-InjectOutputFormats {
     Assert-That 'unknown event fails' { (Invoke-Inject $testHome '.claude' 'claude' 'other').ExitCode -eq 2 }
 }
 
+# Runs inject.ps1 for the harness from the given directory, as the harness does from the project.
+function Invoke-InjectFrom {
+    param([string]$TestHome, [string]$PayloadDirectory, [string]$Harness, [string]$EventName, [string]$Directory)
+    Push-Location -LiteralPath $Directory
+    try {
+        return Invoke-Inject $TestHome $PayloadDirectory $Harness $EventName
+    } finally {
+        Pop-Location
+    }
+}
+
+function Get-ProjectRulesLines {
+    param($Result)
+    return @($Result.Lines | Where-Object { $_ -like '*Project rules:*' })
+}
+
+function Test-InjectProjectRules {
+    Write-Host "inject names the project's own rules file"
+    $testHome = New-TestHome
+    [void](Invoke-Installer $testHome @('-Harness', 'claude,codex,gemini,kiro'))
+    $suffix = '; re-read the relevant section before acting on it.'
+    $fence = '```'
+
+    $project = Join-TestPath $testHome 'project'
+    Write-TestFile (Join-TestPath $project 'CLAUDE.md') "# Rules`n`n## Alpha`n`ntext`n`n${fence}bash`n## not a section`n$fence`n`n## Beta  `n"
+    $claudeFile = [System.IO.Path]::GetFullPath((Join-TestPath $project 'CLAUDE.md'))
+    Assert-That 'Claude names CLAUDE.md and its sections' {
+        $lines = @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.claude' 'claude' 'prompt' $project))
+        $lines.Count -eq 1 -and $lines[0] -eq "- Project rules: $claudeFile apply (Alpha, Beta)$suffix"
+    }
+    Assert-That 'the usage line stays last' {
+        (Get-LastLine (Invoke-InjectFrom $testHome '.claude' 'claude' 'prompt' $project)).StartsWith('Usage:')
+    }
+    Assert-That 'compaction adds no project line' {
+        @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.claude' 'claude' 'compact' $project)).Count -eq 0
+    }
+    Assert-That 'a harness without a project file adds no line' {
+        @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.kiro' 'kiro' 'prompt' $project)).Count -eq 0
+    }
+
+    $plain = Join-TestPath $testHome 'plain'
+    Write-TestFile (Join-TestPath $plain '.claude/CLAUDE.md') "No sections here.`n"
+    $plainFile = [System.IO.Path]::GetFullPath((Join-TestPath $plain '.claude/CLAUDE.md'))
+    Assert-That 'Claude falls back to .claude/CLAUDE.md, without sections' {
+        $lines = @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.claude' 'claude' 'prompt' $plain))
+        $lines.Count -eq 1 -and $lines[0] -eq "- Project rules: $plainFile apply$suffix"
+    }
+    Assert-That 'Codex without AGENTS.md adds no line' {
+        @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.codex' 'codex' 'prompt' $plain)).Count -eq 0
+    }
+
+    $wide = Join-TestPath $testHome 'wide'
+    Write-TestFile (Join-TestPath $wide 'AGENTS.md') ((@(1..13 | ForEach-Object { "## S$_" }) -join "`n") + "`n")
+    Write-TestFile (Join-TestPath $wide 'GEMINI.md') "## Gemini`n"
+    $agentsFile = [System.IO.Path]::GetFullPath((Join-TestPath $wide 'AGENTS.md'))
+    $geminiFile = [System.IO.Path]::GetFullPath((Join-TestPath $wide 'GEMINI.md'))
+    Assert-That 'Codex lists at most 12 sections of AGENTS.md' {
+        $lines = @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.codex' 'codex' 'prompt' $wide))
+        $lines.Count -eq 1 -and $lines[0] -eq "- Project rules: $agentsFile apply (S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, ...)$suffix"
+    }
+
+    $locked = Join-TestPath $testHome 'locked'
+    Write-TestFile (Join-TestPath $locked 'CLAUDE.md') "## Hidden`n"
+    $lockedFile = [System.IO.Path]::GetFullPath((Join-TestPath $locked 'CLAUDE.md'))
+    $lock = [System.IO.File]::Open($lockedFile, 'Open', 'ReadWrite', 'None')
+    try {
+        Assert-That 'an unreadable file keeps the reminder and drops the sections' {
+            $result = Invoke-InjectFrom $testHome '.claude' 'claude' 'prompt' $locked
+            $lines = @(Get-ProjectRulesLines $result)
+            $result.Lines[0] -eq 'Unlazier rules are active for this session.' -and $lines.Count -eq 1 -and $lines[0] -eq "- Project rules: $lockedFile apply$suffix"
+        }
+    } finally {
+        $lock.Dispose()
+    }
+    Assert-That 'Gemini carries the GEMINI.md line in its JSON' {
+        (ConvertFrom-OutputJson (Invoke-InjectFrom $testHome '.gemini' 'gemini' 'prompt' $wide)).hookSpecificOutput.additionalContext.Contains("- Project rules: $geminiFile apply (Gemini)$suffix")
+    }
+
+    # Git may be missing where the suite runs locally; the CI runners have it.
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $ErrorActionPreference = 'Continue'
+        $repository = Join-TestPath $testHome 'repository'
+        [void][System.IO.Directory]::CreateDirectory((Join-TestPath $repository 'sub'))
+        & git -c init.defaultBranch=main -C $repository init -q 2>&1 | Out-Null
+        Write-TestFile (Join-TestPath $repository 'CLAUDE.md') "## Root`n"
+        $rootFile = [System.IO.Path]::Combine([System.IO.Path]::GetFullPath((& git -C $repository rev-parse --show-toplevel)), 'CLAUDE.md')
+        Assert-That 'Claude finds CLAUDE.md at the repository root from a subfolder' {
+            $lines = @(Get-ProjectRulesLines (Invoke-InjectFrom $testHome '.claude' 'claude' 'prompt' (Join-TestPath $repository 'sub')))
+            $lines.Count -eq 1 -and $lines[0] -eq "- Project rules: $rootFile apply (Root)$suffix"
+        }
+    }
+}
+
 function Test-StatusLineSavesUsage {
     Write-Host 'Claude status line shows and saves usage'
     $testHome = New-TestHome
@@ -670,6 +763,7 @@ try {
     Test-InvalidJsonLeftUntouched
     Test-InjectUsageLines
     Test-InjectOutputFormats
+    Test-InjectProjectRules
     Test-StatusLineSavesUsage
     Test-WaitUsageExits
 } finally {
