@@ -6,6 +6,7 @@ All notable changes to Unlazier (called Unlazier AI before version 2.1) are list
 
 ### Added
 
+- **Project rules in the reminder:** with each message, the reminder names the project's own rules file (`CLAUDE.md` or `.claude/CLAUDE.md` for Claude Code, `AGENTS.md` for Codex CLI, OpenCode, and Amp, `GEMINI.md` for Gemini CLI) and up to 12 of its sections, so the project's rules keep their weight between compactions. The file itself is not repeated, because Claude Code already re-reads the project-root `CLAUDE.md` after each compaction.
 - **A background wait for the usage window** (`wait-usage.sh`, and `wait-usage.ps1` on Windows), installed for Claude Code to `~/.claude/unlazier/`. It reads the usage the status line saves and ends with one line (`reset`, `dropped`, `threshold`, or `timeout`) that wakes the session. It captures the reset time once at start, because `resets_at` moves to the next cycle at the reset.
 
 ### Changed

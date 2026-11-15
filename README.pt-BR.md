@@ -37,7 +37,7 @@ O Unlazier adiciona quatro camadas a cada ferramenta. Todas as ferramentas receb
 | Camada | O que faz | Por que importa |
 |--------|-----------|-----------------|
 | **1. Regras** | Coloca as regras na pasta de regras da ferramenta, um arquivo pequeno por regra, ou no arquivo de instruções globais quando a ferramenta não tem pasta de regras. O assistente as lê no início de cada sessão. | O assistente sabe o que se espera dele desde a primeira mensagem. |
-| **2. Lembrete** | Reenvia um resumo curto das regras a cada mensagem sua, e os princípios principais de novo depois que a conversa é compactada. | Em sessões longas, as instruções do início perdem peso conforme a conversa cresce. O lembrete mantém as regras frescas. |
+| **2. Lembrete** | Reenvia um resumo curto das regras a cada mensagem sua, e os princípios principais de novo depois que a conversa é compactada. Quando o projeto tem o próprio arquivo de regras (`CLAUDE.md`, `AGENTS.md` ou `GEMINI.md`), também cita esse arquivo e as seções dele. | Em sessões longas, as instruções do início perdem peso conforme a conversa cresce. O lembrete mantém as regras frescas. |
 | **3. Uso** | Acrescenta ao lembrete uma linha dizendo quanto dos seus limites de uso de 5 horas e semanal já foi consumido. | O assistente pode rodar tarefas em paralelo quando há folga e desacelerar antes de você atingir um limite. |
 | **4. Alertas** | Toca três bipes curtos quando o assistente pede sua permissão, faz uma pergunta ou termina a vez dele. | Você pode fazer outra coisa enquanto ele trabalha e voltar quando ele precisar de você. |
 
