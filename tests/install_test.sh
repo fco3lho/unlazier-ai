@@ -399,6 +399,57 @@ test_inject_usage_lines() {
         = "Usage: unknown (no usage reading from the last 15 minutes)"
 }
 
+# Runs inject.sh for the harness from the given directory, as the harness does from the project.
+inject_from() {
+    local home="$1" folder="$2" harness="$3" event="$4" directory="$5"
+    (cd "$directory" && bash "$home/$folder/unlazier/inject.sh" "$harness" "$event")
+}
+
+project_rules_of() { inject_from "$@" | grep '^- Project rules:'; }
+
+has_no_project_rules() { ! inject_from "$@" | grep -q 'Project rules:'; }
+
+test_inject_project_rules() {
+    local home repository plain wide expected
+    echo "inject names the project's own rules file"
+    home="$(new_home)"
+    run_installer "$home" --harness claude,codex,gemini,kiro >/dev/null 2>&1
+
+    repository="$home/repository"
+    mkdir -p "$repository/sub"
+    git -C "$repository" init -q
+    repository="$(cd "$repository" && pwd -P)"
+    # shellcheck disable=SC2016  # the backticks are a literal code fence
+    printf '# Rules\n\n## Alpha\n\ntext\n\n```bash\n## not a section\n```\n\n## Beta  \n' > "$repository/CLAUDE.md"
+    expected="- Project rules: $repository/CLAUDE.md apply (Alpha, Beta); re-read the relevant section before acting on it."
+    check "Claude names the repository CLAUDE.md and its sections" \
+        test "$(project_rules_of "$home" .claude claude prompt "$repository/sub")" = "$expected"
+    check "the usage line stays last" \
+        test -n "$(inject_from "$home" .claude claude prompt "$repository" | tail -n 1 | grep '^Usage:')"
+    check "compaction adds no project line" has_no_project_rules "$home" .claude claude compact "$repository"
+    check "a harness without a project file adds no line" has_no_project_rules "$home" .kiro kiro prompt "$repository"
+
+    plain="$home/plain"
+    mkdir -p "$plain/.claude"
+    plain="$(cd "$plain" && pwd -P)"
+    printf 'No sections here.\n' > "$plain/.claude/CLAUDE.md"
+    check "Claude falls back to .claude/CLAUDE.md, without sections" \
+        test "$(project_rules_of "$home" .claude claude prompt "$plain")" \
+        = "- Project rules: $plain/.claude/CLAUDE.md apply; re-read the relevant section before acting on it."
+    check "Codex without AGENTS.md adds no line" has_no_project_rules "$home" .codex codex prompt "$plain"
+
+    wide="$home/wide"
+    mkdir -p "$wide"
+    wide="$(cd "$wide" && pwd -P)"
+    for number in 1 2 3 4 5 6 7 8 9 10 11 12 13; do printf '## S%s\n' "$number"; done > "$wide/AGENTS.md"
+    printf '## Gemini\n' > "$wide/GEMINI.md"
+    check "Codex lists at most 12 sections of AGENTS.md" \
+        test "$(project_rules_of "$home" .codex codex prompt "$wide")" \
+        = "- Project rules: $wide/AGENTS.md apply (S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, ...); re-read the relevant section before acting on it."
+    check "Gemini carries the GEMINI.md line in its JSON" json_has <(inject_from "$home" .gemini gemini prompt "$wide") \
+        ".hookSpecificOutput.additionalContext | contains(\"- Project rules: $wide/GEMINI.md apply (Gemini);\")"
+}
+
 # Writes a usage snapshot with one window; an empty resets_at leaves the field out.
 write_rate_limits() {
     local home="$1" window="$2" used="$3" resets_at="${4:-null}"
@@ -509,6 +560,7 @@ main() {
     test_missing_jq_installs_rules_only
     test_inject_usage_lines
     test_inject_output_formats
+    test_inject_project_rules
     test_statusline_saves_usage
     test_wait_usage_exits
     test_cline_question_alert_filters_tools
